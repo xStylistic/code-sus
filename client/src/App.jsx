@@ -15,6 +15,26 @@ const socket = io(defaultServerUrl, {
   autoConnect: true
 });
 
+function formatGameCode(input, language = "javascript") {
+  const source = String(input ?? "").replace(/\r\n?/g, "\n");
+  if (!source.trim()) {
+    return "";
+  }
+
+  const normalized = source
+    .split("\n")
+    .map((line) => line.replace(/\s+$/g, "").replace(/\t/g, "  "))
+    .join("\n")
+    .replace(/^\n+|\n+$/g, "");
+
+  if (!normalized) {
+    return "";
+  }
+
+  const needsTrailingNewline = ["javascript", "python", "java", "cpp", "c"].includes(language);
+  return needsTrailingNewline ? `${normalized}\n` : normalized;
+}
+
 export default function App() {
   const [form, setForm] = useState({ name: "Ada", roomId: "", preferredLanguage: "javascript" });
   const [roomState, setRoomState] = useState(null);
@@ -26,8 +46,12 @@ export default function App() {
   const [roleReveal, setRoleReveal] = useState(null);
   const [imposterHints, setImposterHints] = useState(null);
   const [aiVerification, setAiVerification] = useState(null);
+  const [imposterHintsByTask, setImposterHintsByTask] = useState({});
+  const [aiVerificationByTask, setAiVerificationByTask] = useState({});
+  const [aiError, setAiError] = useState("");
   const [meetingInsights, setMeetingInsights] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [geminiLoadingScreen, setGeminiLoadingScreen] = useState(false);
   const [aiReviews, setAiReviews] = useState([]);
 
   useEffect(() => {
@@ -157,7 +181,10 @@ export default function App() {
   }
 
   async function startGame() {
+    setError("");
+    setGeminiLoadingScreen(true);
     const response = await emitWithAck("start_game");
+    setGeminiLoadingScreen(false);
     if (!response.ok) {
       setError(response.error);
     }
@@ -174,37 +201,70 @@ export default function App() {
       return;
     }
 
-    setTask(response.task);
-    setTaskCode(response.task.currentCode ?? response.task.starterCode ?? "");
+    const openedTask = {
+      ...response.task,
+      starterCode: formatGameCode(response.task.starterCode, response.task.language),
+      currentCode: formatGameCode(
+        response.task.currentCode ?? response.task.starterCode,
+        response.task.language
+      )
+    };
+    const cachedHints = imposterHintsByTask[openedTask.id] ?? null;
+    const cachedVerification = aiVerificationByTask[openedTask.id] ?? null;
+
+    setTask(openedTask);
+    setTaskCode(openedTask.currentCode ?? openedTask.starterCode ?? "");
     setFeedback(null);
     setRunResult(null);
-    setImposterHints(null);
-    setAiVerification(null);
+    setImposterHints(cachedHints);
+    setAiVerification(cachedVerification);
+    setAiError("");
     setError("");
 
     // If imposter, fetch AI sabotage hints in the background
-    if (response.task.fakeOnly) {
-      fetchImposterHints(response.task.id);
+    if (openedTask.fakeOnly && !cachedHints) {
+      fetchImposterHints(openedTask.id);
     }
   }
 
   async function fetchImposterHints(taskId) {
+    setAiError("");
     setAiLoading(true);
     const result = await emitWithAck("request_imposter_hints", { taskId });
     setAiLoading(false);
     if (result.ok && result.hints) {
-      setImposterHints(result.hints);
+      const formattedHints = result.hints.map((hint) => ({
+        ...hint,
+        code_snippet: formatGameCode(hint.code_snippet, task?.language)
+      }));
+
+      setImposterHints(formattedHints);
+      setImposterHintsByTask((current) => ({
+        ...current,
+        [taskId]: formattedHints
+      }));
+      return;
     }
+
+    setAiError(result.error || "Failed to load AI sabotage hints.");
   }
 
   async function autoAiReview(taskId, code, taskTitle) {
+    setAiError("");
     setAiLoading(true);
     const result = await emitWithAck("request_ai_verify", { taskId, code });
     setAiLoading(false);
     if (result.ok && result.verification) {
       setAiVerification(result.verification);
+      setAiVerificationByTask((current) => ({
+        ...current,
+        [taskId]: result.verification
+      }));
       setAiReviews((prev) => [...prev, { taskTitle, ...result.verification }]);
+      return;
     }
+
+    setAiError(result.error || "AI review failed.");
   }
 
   async function fetchMeetingInsights() {
@@ -224,6 +284,16 @@ export default function App() {
 
     setTaskCode(nextCode);
     socket.emit("update_task_code", { taskId: task.id, code: nextCode });
+  }
+
+  function formatCurrentTaskCode() {
+    if (!task) {
+      return;
+    }
+
+    const formatted = formatGameCode(taskCode, task.language);
+    setTaskCode(formatted);
+    socket.emit("update_task_code", { taskId: task.id, code: formatted });
   }
 
   function handleTaskCursorChange(selectionStart, selectionEnd) {
@@ -253,6 +323,14 @@ export default function App() {
     const result = await emitWithAck("submit_task", { taskId, response });
     setRunResult(result.result ?? null);
 
+    if (result.aiVerification) {
+      setAiVerification(result.aiVerification);
+      setAiVerificationByTask((current) => ({
+        ...current,
+        [taskId]: result.aiVerification
+      }));
+    }
+
     if (!result.ok) {
       setFeedback({ ok: false, message: result.error });
     } else {
@@ -261,7 +339,9 @@ export default function App() {
 
     // Auto-trigger AI review for codemates on every submission (pass or fail)
     const currentTask = task;
-    if (currentTask && !currentTask.fakeOnly) {
+    if (currentTask && !currentTask.fakeOnly && result.ok && result.aiVerification) {
+      setAiReviews((prev) => [...prev, { taskTitle: currentTask.title, ...result.aiVerification }]);
+    } else if (currentTask && !currentTask.fakeOnly && !result.aiVerification) {
       autoAiReview(taskId, response.code, currentTask.title);
     } else if (result.ok) {
       // Imposter faking — just close after a short delay
@@ -308,6 +388,7 @@ export default function App() {
     setRunResult(null);
     setImposterHints(null);
     setAiVerification(null);
+    setAiError("");
   }
 
   return (
@@ -322,6 +403,7 @@ export default function App() {
           onLanguageChange={changeLanguage}
           onReadyToggle={toggleReady}
           onStartGame={startGame}
+          isLoadingGemini={geminiLoadingScreen}
           error={error}
         />
       ) : (
@@ -342,6 +424,7 @@ export default function App() {
         onClose={resetOverlay}
         onRun={runTask}
         onSubmit={submitTask}
+        onFormat={formatCurrentTaskCode}
         feedback={feedback}
         runResult={runResult}
         isBlackout={roomState?.activeSabotage?.type === "blackout"}
@@ -350,6 +433,7 @@ export default function App() {
         currentPlayerId={roomState?.currentPlayerId}
         imposterHints={imposterHints}
         aiVerification={aiVerification}
+        aiError={aiError}
         aiLoading={aiLoading}
       />
       <RoleRevealModal role={roleReveal} onClose={() => setRoleReveal(null)} />
@@ -361,6 +445,15 @@ export default function App() {
         aiLoading={aiLoading}
       />
       {roomState?.state === "ended" ? <EndScreen roomState={roomState} aiReviews={aiReviews} onReset={() => window.location.reload()} /> : null}
+
+      {geminiLoadingScreen ? (
+        <div className="loading-screen" role="status" aria-live="polite" aria-label="Gemini loading">
+          <div className="loading-screen-card">
+            <div className="loading-spinner" />
+            <h3>Preparing Match</h3>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

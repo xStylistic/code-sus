@@ -9,6 +9,7 @@ export function LobbyScreen({
   onLanguageChange,
   onReadyToggle,
   onStartGame,
+  isLoadingGemini,
   error
 }) {
   const players = roomState?.players ?? [];
@@ -90,8 +91,8 @@ export function LobbyScreen({
         </div>
 
         {isHost && players.length >= 3 ? (
-          <button onClick={onStartGame} disabled={!everyoneReady}>
-            Launch Match
+          <button onClick={onStartGame} disabled={!everyoneReady || isLoadingGemini}>
+            {isLoadingGemini ? "Generating Match..." : "Launch Match"}
           </button>
         ) : null}
 

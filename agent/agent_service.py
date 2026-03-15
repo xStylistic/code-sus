@@ -82,19 +82,40 @@ class MeetingInsight(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class GenerateTaskRequest(BaseModel):
-    task_type: Literal["inheritance", "polymorphism", "encapsulation"]
+    task_type: Literal[
+        "inheritance",
+        "polymorphism",
+        "encapsulation",
+        "abstraction",
+        "composition",
+        "single_responsibility"
+    ]
     language: str = "javascript"
 
 
 class ImposterHintsRequest(BaseModel):
-    task_type: Literal["inheritance", "polymorphism", "encapsulation"]
+    task_type: Literal[
+        "inheritance",
+        "polymorphism",
+        "encapsulation",
+        "abstraction",
+        "composition",
+        "single_responsibility"
+    ]
     language: str = "javascript"
     current_code: str = ""
     prompt: str = ""
 
 
 class VerifyCodeRequest(BaseModel):
-    task_type: Literal["inheritance", "polymorphism", "encapsulation"]
+    task_type: Literal[
+        "inheritance",
+        "polymorphism",
+        "encapsulation",
+        "abstraction",
+        "composition",
+        "single_responsibility"
+    ]
     language: str = "javascript"
     code: str
     task_prompt: str

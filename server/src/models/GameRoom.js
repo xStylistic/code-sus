@@ -7,12 +7,14 @@ import { cloneTaskTemplates } from "../data/taskTemplates.js";
 import { pickRandomLayout } from "../data/mapLayouts.js";
 import { evaluateTaskCode } from "../game/taskRunner.js";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "../data/languages.js";
+import { generateTask, getImposterHints, verifyCode } from "../services/agentBridge.js";
 
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 3;
 const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
 const BLACKOUT_COOLDOWN_MS = 10000;
+const OPTIMAL_SIMILARITY_THRESHOLD = 0.9;
 
 export class GameRoom {
   constructor(roomId, hostSocketId, hostName, preferredLanguage = "javascript") {
@@ -129,7 +131,7 @@ export class GameRoom {
     return { ok: true };
   }
 
-  startGame() {
+  async startGame() {
     this.clearMeetingTimer();
     this.state = "in_game";
     this.winner = null;
@@ -164,6 +166,72 @@ export class GameRoom {
 
     const imposterIndex = Math.floor(Math.random() * playerList.length);
     playerList[imposterIndex].role = Role.IMPOSTER;
+
+    await this.generateAiChallengesForMatch();
+  }
+
+  async generateAiChallengesForMatch() {
+    for (const task of this.tasks) {
+      const language = this.selectedLanguage;
+      const languageTask = task.languages?.[language] ?? task.languages?.javascript;
+      if (!languageTask) {
+        continue;
+      }
+
+      const generated = await generateTask(task.type, language);
+      if (!generated?.ok || !generated.task) {
+        continue;
+      }
+
+      const generatedTask = generated.task;
+      task.title = generatedTask.title || task.title;
+      task.prompt = generatedTask.prompt || task.prompt;
+      task.visibleChecks = Array.isArray(generatedTask.visible_checks) && generatedTask.visible_checks.length
+        ? generatedTask.visible_checks
+        : task.visibleChecks;
+
+      languageTask.starterCode = generatedTask.starter_code || languageTask.starterCode;
+      languageTask.validationPatterns = Array.isArray(generatedTask.validation_patterns)
+        ? generatedTask.validation_patterns
+        : [];
+      languageTask.optimalSolution = generatedTask.solution_code || "";
+      task.aiGenerated = true;
+
+      const sabotage = await getImposterHints(task.type, language, languageTask.starterCode, task.prompt);
+      if (sabotage?.ok && Array.isArray(sabotage.hints) && sabotage.hints[0]?.code_snippet) {
+        languageTask.corruptedStarterCode = sabotage.hints[0].code_snippet;
+      }
+    }
+
+    for (const task of this.tasks) {
+      this.sharedTaskCode[task.id] = this.getStarterCode(task);
+    }
+  }
+
+  evaluateAgainstOptimal(task, submittedCode) {
+    const languageTask = task.languages?.[this.selectedLanguage] ?? task.languages?.javascript;
+    const optimalSolution = String(languageTask?.optimalSolution ?? "");
+
+    if (!optimalSolution.trim()) {
+      return null;
+    }
+
+    const similarity = computeSimilarity(submittedCode, optimalSolution);
+    const passed = similarity >= OPTIMAL_SIMILARITY_THRESHOLD;
+
+    return {
+      passed,
+      summary: passed
+        ? "Submission matches the optimal reference closely."
+        : "Submission differs too much from the optimal reference.",
+      results: [
+        {
+          name: "Similarity to optimal solution",
+          passed,
+          message: `${Math.round(similarity * 100)}% match (required ${Math.round(OPTIMAL_SIMILARITY_THRESHOLD * 100)}%)`
+        }
+      ]
+    };
   }
 
   updatePlayerPosition(socketId, dx, dy) {
@@ -261,13 +329,16 @@ export class GameRoom {
       };
     }
 
+    const submittedCode = response?.code ?? this.sharedTaskCode[task.id];
+    const optimalResult = this.evaluateAgainstOptimal(task, submittedCode);
+
     return {
       ok: true,
-      result: evaluateTaskCode(task, this.selectedLanguage, response?.code ?? this.sharedTaskCode[task.id])
+      result: optimalResult ?? evaluateTaskCode(task, this.selectedLanguage, submittedCode)
     };
   }
 
-  submitTask(socketId, taskId, response) {
+  async submitTask(socketId, taskId, response) {
     const player = this.players.get(socketId);
     const task = this.tasks.find((entry) => entry.id === taskId);
 
@@ -284,12 +355,31 @@ export class GameRoom {
     }
 
     const submittedCode = response?.code ?? this.sharedTaskCode[task.id];
-    const result = evaluateTaskCode(task, this.selectedLanguage, submittedCode);
+    const result = this.evaluateAgainstOptimal(task, submittedCode) ?? evaluateTaskCode(task, this.selectedLanguage, submittedCode);
     if (!result.passed) {
       return {
         ok: false,
         error: result.summary,
         result
+      };
+    }
+
+    const aiResult = await verifyCode(task.type, this.selectedLanguage, submittedCode, task.prompt);
+    if (!aiResult?.ok || !aiResult.verification) {
+      return {
+        ok: false,
+        error: aiResult?.error || "AI verification unavailable.",
+        result,
+        aiVerification: null
+      };
+    }
+
+    if (!aiResult.verification.is_correct) {
+      return {
+        ok: false,
+        error: aiResult.verification.explanation || "AI review rejected this solution.",
+        result,
+        aiVerification: aiResult.verification
       };
     }
 
@@ -304,7 +394,7 @@ export class GameRoom {
     }
 
     this.evaluateWinConditions();
-    return { ok: true, fake: false, message: "Task completed.", result };
+    return { ok: true, fake: false, message: "Task completed.", result, aiVerification: aiResult.verification };
   }
 
   triggerSabotage(socketId, type) {
@@ -577,9 +667,11 @@ export class GameRoom {
         stationId: task.stationId,
         type: task.type,
         title: task.title,
+        prompt: task.prompt,
         status: task.status,
         completedBy: task.completedBy,
-        corrupted: task.id === this.corruptedTaskId
+        corrupted: task.id === this.corruptedTaskId,
+        optimalSolution: this.state === "ended" ? this.getOptimalSolution(task) : null
       })),
       taskProgress: this.tasks.length ? this.completedTaskCount / this.tasks.length : 0,
       activeSabotage: this.activeSabotage?.serialize() ?? null,
@@ -611,8 +703,56 @@ GameRoom.prototype.getStarterCode = function getStarterCode(task) {
     : languageTask.starterCode;
 };
 
+GameRoom.prototype.getOptimalSolution = function getOptimalSolution(task) {
+  const languageTask = task.languages[this.selectedLanguage] ?? task.languages.javascript;
+  return languageTask?.optimalSolution ?? null;
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function normalizeCode(source) {
+  return String(source ?? "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/#.*$/gm, "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function levenshteinDistance(a, b) {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const matrix = Array.from({ length: rows }, () => new Array(cols).fill(0));
+
+  for (let i = 0; i < rows; i += 1) matrix[i][0] = i;
+  for (let j = 0; j < cols; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[rows - 1][cols - 1];
+}
+
+function computeSimilarity(actualCode, expectedCode) {
+  const actual = normalizeCode(actualCode);
+  const expected = normalizeCode(expectedCode);
+  if (!expected.length && !actual.length) return 1;
+  if (!expected.length || !actual.length) return 0;
+
+  const distance = levenshteinDistance(actual, expected);
+  const longest = Math.max(actual.length, expected.length);
+  return Math.max(0, 1 - distance / longest);
 }
 
 // Walkable zones: must match MAP_WALKABLE in client/src/data/mapData.js

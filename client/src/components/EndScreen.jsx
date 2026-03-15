@@ -50,6 +50,24 @@ export function EndScreen({ roomState, aiReviews, onReset }) {
           </div>
         ) : null}
 
+        {roomState.tasks?.some((task) => task.optimalSolution) ? (
+          <div className="end-reviews">
+            <h3>Optimal Solutions</h3>
+            <p className="helper-text">Revealed only after the match ends.</p>
+            {roomState.tasks
+              .filter((task) => task.optimalSolution)
+              .map((task) => (
+                <div key={task.id} className="end-review-card">
+                  <div className="task-panel-header">
+                    <span>{task.title}</span>
+                    <span>Reference</span>
+                  </div>
+                  <pre className="snippet">{task.optimalSolution}</pre>
+                </div>
+              ))}
+          </div>
+        ) : null}
+
         <button onClick={onReset}>Back To Lobby</button>
       </div>
     </div>

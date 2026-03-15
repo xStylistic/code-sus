@@ -111,7 +111,7 @@ io.on("connection", (socket) => {
     callback({ ok: true });
   });
 
-  socket.on("start_game", (_payload, callback = () => {}) => {
+  socket.on("start_game", async (_payload, callback = () => {}) => {
     const room = getCurrentRoom(socket.id);
     const canStart = room?.canStart(socket.id);
     if (!room || !canStart?.ok) {
@@ -119,7 +119,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.startGame();
+    await room.startGame();
     callback({ ok: true });
     syncRoom(room.roomId);
   });
@@ -147,9 +147,9 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("submit_task", ({ taskId, response }, callback = () => {}) => {
+  socket.on("submit_task", async ({ taskId, response }, callback = () => {}) => {
     const room = getCurrentRoom(socket.id);
-    const result = room?.submitTask(socket.id, taskId, response);
+    const result = await room?.submitTask(socket.id, taskId, response);
     if (!room || !result?.ok) {
       callback(result ?? { ok: false, error: "Room not found." });
       return;
