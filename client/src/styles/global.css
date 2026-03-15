@@ -497,6 +497,10 @@ select {
   font-size: 0.82rem;
 }
 
+.code-editor-wrap {
+  position: relative;
+}
+
 .code-editor {
   width: 100%;
   min-height: min(42vh, 360px);
@@ -510,6 +514,34 @@ select {
   font-family: "SFMono-Regular", "Menlo", "Monaco", monospace;
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+.cursor-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.remote-cursor {
+  position: absolute;
+  width: 2px;
+  height: 1.35em;
+  border-radius: 2px;
+  z-index: 3;
+}
+
+.remote-cursor-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 8px;
+  color: #102542;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .results-list {

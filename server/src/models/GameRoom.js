@@ -23,6 +23,7 @@ export class GameRoom {
     this.tasks = [];
     this.sharedTaskCode = {};
     this.taskEditors = {};
+    this.taskCursors = {};
     this.taskProgress = 0;
     this.meeting = null;
     this.activeSabotage = null;
@@ -32,6 +33,7 @@ export class GameRoom {
     this.winner = null;
     this.statusText = "Waiting for players";
     this.scheduledActions = new Set();
+    this.meetingTimer = null;
 
     this.addPlayer(hostSocketId, hostName, true, preferredLanguage);
   }
@@ -54,6 +56,10 @@ export class GameRoom {
       for (const taskId of Object.keys(this.taskEditors)) {
         this.taskEditors[taskId] = this.taskEditors[taskId].filter((name) => name !== removed.name);
       }
+
+      for (const taskId of Object.keys(this.taskCursors)) {
+        delete this.taskCursors[taskId]?.[socketId];
+      }
     }
 
     if (removed?.isHost) {
@@ -61,6 +67,13 @@ export class GameRoom {
       if (nextHost) {
         nextHost.isHost = true;
         this.hostId = nextHost.id;
+      }
+    }
+
+    if (this.meeting && removed) {
+      this.meeting.voteManager.removeVoter(socketId);
+      if (this.meeting.voteManager.allVotesIn()) {
+        this.finalizeMeeting();
       }
     }
 
@@ -114,6 +127,7 @@ export class GameRoom {
   }
 
   startGame() {
+    this.clearMeetingTimer();
     this.state = "in_game";
     this.winner = null;
     this.statusText = "Complete tasks and watch for sabotage";
@@ -126,6 +140,7 @@ export class GameRoom {
     this.tasks = cloneTaskTemplates().map((taskTemplate) => new Task(taskTemplate));
     this.sharedTaskCode = {};
     this.taskEditors = {};
+    this.taskCursors = {};
 
     const playerList = [...this.players.values()];
     playerList.forEach((player) => {
@@ -137,6 +152,7 @@ export class GameRoom {
     for (const task of this.tasks) {
       this.sharedTaskCode[task.id] = this.getStarterCode(task);
       this.taskEditors[task.id] = [];
+      this.taskCursors[task.id] = {};
     }
 
     const imposterIndex = Math.floor(Math.random() * playerList.length);
@@ -191,6 +207,7 @@ export class GameRoom {
       starterCode: this.getStarterCode(task),
       currentCode: this.sharedTaskCode[task.id] ?? this.getStarterCode(task),
       activeEditors: this.taskEditors[task.id] ?? [],
+      cursors: Object.values(this.taskCursors[task.id] ?? {}),
       visibleChecks: task.visibleChecks,
       corrupted: task.id === this.corruptedTaskId,
       fakeOnly: player.role === Role.IMPOSTER
@@ -333,7 +350,41 @@ export class GameRoom {
       payload: {
         taskId,
         code: this.sharedTaskCode[taskId],
-        activeEditors: this.taskEditors[taskId]
+        activeEditors: this.taskEditors[taskId],
+        cursors: Object.values(this.taskCursors[taskId] ?? {})
+      }
+    };
+  }
+
+  updateTaskCursor(socketId, taskId, selectionStart, selectionEnd) {
+    const player = this.players.get(socketId);
+    const task = this.tasks.find((entry) => entry.id === taskId);
+
+    if (!player || !task || !player.isAlive || this.state !== "in_game" || this.meeting) {
+      return { ok: false, error: "Cursor sync is unavailable right now." };
+    }
+
+    const code = this.sharedTaskCode[taskId] ?? this.getStarterCode(task);
+    const maxIndex = code.length;
+    const start = Math.max(0, Math.min(Number(selectionStart) || 0, maxIndex));
+    const end = Math.max(0, Math.min(Number(selectionEnd) || start, maxIndex));
+
+    if (!this.taskCursors[taskId]) {
+      this.taskCursors[taskId] = {};
+    }
+
+    this.taskCursors[taskId][socketId] = {
+      playerId: socketId,
+      name: player.name,
+      start,
+      end
+    };
+
+    return {
+      ok: true,
+      payload: {
+        taskId,
+        cursors: Object.values(this.taskCursors[taskId])
       }
     };
   }
@@ -345,10 +396,15 @@ export class GameRoom {
     }
 
     this.taskEditors[taskId] = this.taskEditors[taskId].filter((name) => name !== player.name);
+    if (this.taskCursors[taskId]) {
+      delete this.taskCursors[taskId][socketId];
+    }
+
     return {
       taskId,
       code: this.sharedTaskCode[taskId],
-      activeEditors: this.taskEditors[taskId]
+      activeEditors: this.taskEditors[taskId],
+      cursors: Object.values(this.taskCursors[taskId] ?? {})
     };
   }
 
@@ -358,7 +414,9 @@ export class GameRoom {
       return { ok: false, error: "Meeting unavailable." };
     }
 
-    const voters = [...this.players.values()].filter((player) => player.isAlive).map((player) => player.id);
+    this.clearMeetingTimer();
+
+    const voters = [...this.players.values()].map((player) => player.id);
     this.meeting = new MeetingManager(voters);
     this.statusText = `${caller.name} called a meeting`;
     return { ok: true };
@@ -370,8 +428,8 @@ export class GameRoom {
     }
 
     const voter = this.players.get(voterId);
-    if (!voter?.isAlive) {
-      return { ok: false, error: "Only alive players can vote." };
+    if (!voter) {
+      return { ok: false, error: "Only players in the room can vote." };
     }
 
     const accepted = this.meeting.voteManager.submitVote(voterId, targetId);
@@ -387,8 +445,16 @@ export class GameRoom {
       return null;
     }
 
-    const result = this.meeting.voteManager.tally();
-    this.meeting.result = result;
+    const meeting = this.meeting;
+    this.clearMeetingTimer();
+
+    const result = meeting.voteManager.tally();
+    meeting.result = result;
+
+    const finalized = {
+      ...meeting.serialize(),
+      result
+    };
 
     if (result.eliminatedId) {
       const eliminatedPlayer = this.players.get(result.eliminatedId);
@@ -398,14 +464,8 @@ export class GameRoom {
     }
 
     this.statusText = result.eliminatedId ? "Vote complete" : "Vote skipped";
-    this.evaluateWinConditions();
-
-    const finalized = {
-      ...this.meeting.serialize(),
-      result
-    };
-
     this.meeting = null;
+    this.evaluateWinConditions();
     return finalized;
   }
 
@@ -431,6 +491,7 @@ export class GameRoom {
     if (this.winner) {
       this.state = "ended";
       this.statusText = `${this.winner} win`;
+      this.clearMeetingTimer();
       this.meeting = null;
       this.activeSabotage = null;
     }
@@ -442,11 +503,28 @@ export class GameRoom {
     this.scheduledActions.add(action);
   }
 
+  setMeetingTimer(timer) {
+    this.clearMeetingTimer();
+    this.meetingTimer = timer;
+    this.schedule(timer);
+  }
+
+  clearMeetingTimer() {
+    if (!this.meetingTimer) {
+      return;
+    }
+
+    clearTimeout(this.meetingTimer);
+    this.scheduledActions.delete(this.meetingTimer);
+    this.meetingTimer = null;
+  }
+
   clearSchedules() {
     for (const timer of this.scheduledActions) {
       clearTimeout(timer);
     }
     this.scheduledActions.clear();
+    this.meetingTimer = null;
   }
 
   get completedTaskCount() {

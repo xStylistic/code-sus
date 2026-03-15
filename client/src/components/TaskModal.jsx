@@ -1,11 +1,16 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator }) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
+  const [remoteMarkers, setRemoteMarkers] = useState([]);
+  const remoteCursors = useMemo(() => {
+    return (task?.cursors ?? []).filter((cursor) => cursor.playerId !== currentPlayerId);
+  }, [task?.cursors, currentPlayerId]);
 
   useEffect(() => {
     selectionRef.current = { start: null, end: null };
+    setRemoteMarkers([]);
   }, [task?.id]);
 
   useLayoutEffect(() => {
@@ -23,6 +28,40 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
     const nextEnd = Math.min(selection.end, code.length);
     editor.setSelectionRange(nextStart, nextEnd);
   }, [code]);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !task) {
+      return;
+    }
+
+    const refreshMarkers = () => {
+      const markers = remoteCursors
+        .filter((cursor) => typeof cursor?.start === "number")
+        .map((cursor) => {
+          const position = Math.max(0, Math.min(cursor.start, code.length));
+          const caret = getCaretCoordinates(editor, position);
+          return {
+            playerId: cursor.playerId,
+            name: cursor.name,
+            top: caret.top,
+            left: caret.left,
+            color: getCursorColor(cursor.playerId ?? cursor.name)
+          };
+        });
+
+      setRemoteMarkers(markers);
+    };
+
+    refreshMarkers();
+    editor.addEventListener("scroll", refreshMarkers);
+    window.addEventListener("resize", refreshMarkers);
+
+    return () => {
+      editor.removeEventListener("scroll", refreshMarkers);
+      window.removeEventListener("resize", refreshMarkers);
+    };
+  }, [task, remoteCursors, code]);
 
   if (!task) {
     return null;
@@ -120,4 +159,42 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
       </div>
     </div>
   );
+}
+
+function getCursorColor(seed) {
+  const hash = String(seed ?? "").split("").reduce((value, char) => value + char.charCodeAt(0), 0);
+  return CURSOR_COLORS[hash % CURSOR_COLORS.length];
+}
+
+function getCaretCoordinates(textarea, position) {
+  const style = window.getComputedStyle(textarea);
+  const mirror = document.createElement("div");
+  const marker = document.createElement("span");
+
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordBreak = "break-word";
+  mirror.style.overflow = "hidden";
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.fontWeight = style.fontWeight;
+  mirror.style.fontStyle = style.fontStyle;
+  mirror.style.letterSpacing = style.letterSpacing;
+  mirror.style.lineHeight = style.lineHeight;
+  mirror.style.padding = style.padding;
+  mirror.style.border = style.border;
+  mirror.style.width = `${textarea.clientWidth}px`;
+
+  const safePosition = Math.max(0, Math.min(position, textarea.value.length));
+  mirror.textContent = textarea.value.slice(0, safePosition);
+  marker.textContent = textarea.value[safePosition] || " ";
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+
+  const top = marker.offsetTop - textarea.scrollTop;
+  const left = marker.offsetLeft - textarea.scrollLeft;
+
+  document.body.removeChild(mirror);
+  return { top, left };
 }

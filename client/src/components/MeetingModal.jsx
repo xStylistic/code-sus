@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export function MeetingModal({ roomState, onVote }) {
   const meeting = roomState?.meeting;
   const me = roomState?.players.find((player) => player.id === roomState.currentPlayerId);
+  const canVote = Boolean(me);
   const alivePlayers = roomState?.players.filter((player) => player.isAlive) ?? [];
   const alreadyVoted = Boolean(meeting?.votes?.[roomState.currentPlayerId]);
   const [now, setNow] = useState(Date.now());
@@ -18,7 +19,7 @@ export function MeetingModal({ roomState, onVote }) {
 
   const secondsLeft = meeting ? Math.max(0, Math.ceil((meeting.endsAt - now) / 1000)) : 0;
 
-  if (!meeting || !me?.isAlive) {
+  if (!meeting || !canVote) {
     return null;
   }
 
