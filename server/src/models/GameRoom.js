@@ -13,7 +13,8 @@ const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 3;
 const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
-const BLACKOUT_COOLDOWN_MS = 5000;
+const BLACKOUT_COOLDOWN_MS = 10000;
+const MEETING_COOLDOWN_MS = 15000;
 const MATCH_DURATION_MS = 3 * 60 * 1000;
 const OPTIMAL_SIMILARITY_THRESHOLD = 0.9;
 const AI_VERIFY_RETRY_BASE_MS = 1500;
@@ -40,6 +41,7 @@ export class GameRoom {
     this.statusText = "Waiting for players";
     this.scheduledActions = new Set();
     this.meetingTimer = null;
+    this.meetingCooldownUntil = 0;
     this.matchTimer = null;
     this.matchDeadline = null;
 
@@ -49,6 +51,10 @@ export class GameRoom {
   }
 
   addPlayer(socketId, name, isHost = false, preferredLanguage = "javascript") {
+    if (this.players.has(socketId)) {
+      return { ok: false, error: "You are already in this room." };
+    }
+
     if (this.players.size >= MAX_PLAYERS || this.state !== "lobby") {
       return { ok: false, error: "Room is full or already started." };
     }
@@ -103,6 +109,21 @@ export class GameRoom {
     }
 
     player.isReady = isReady;
+    return true;
+  }
+
+  setPlayerColor(socketId, color) {
+    const player = this.players.get(socketId);
+    if (!player || this.state !== "lobby") {
+      return false;
+    }
+
+    const validColors = ["purple", "blue", "cyan", "red", "green", "yellow", "orange", "pink"];
+    if (!validColors.includes(color)) {
+      return false;
+    }
+
+    player.color = color;
     return true;
   }
 
@@ -573,6 +594,10 @@ export class GameRoom {
       return { ok: false, error: "Meeting unavailable." };
     }
 
+    if (Date.now() < this.meetingCooldownUntil) {
+      return { ok: false, error: "Meeting is cooling down." };
+    }
+
     this.clearMeetingTimer();
 
     const voters = [...this.players.values()].map((player) => player.id);
@@ -624,6 +649,7 @@ export class GameRoom {
 
     this.statusText = result.eliminatedId ? "Vote complete" : "Vote skipped";
     this.meeting = null;
+    this.meetingCooldownUntil = Date.now() + MEETING_COOLDOWN_MS;
     this.evaluateWinConditions();
     return finalized;
   }
@@ -738,6 +764,7 @@ export class GameRoom {
       taskProgress: this.tasks.length ? this.completedTaskCount / this.tasks.length : 0,
       activeSabotage: this.activeSabotage?.serialize() ?? null,
       blackoutCooldownUntil: this.blackoutCooldownUntil,
+      meetingCooldownUntil: this.meetingCooldownUntil,
       matchDeadline: this.matchDeadline,
       disruption: this.disruption,
       meeting: this.meeting?.serialize() ?? null,

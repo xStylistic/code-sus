@@ -1,4 +1,5 @@
 import { LANGUAGE_OPTIONS } from "../data/languages.js";
+import { PLAYER_COLORS, getColorByKey } from "../data/playerColors.js";
 
 export function LobbyScreen({
   form,
@@ -7,6 +8,7 @@ export function LobbyScreen({
   onJoinRoom,
   roomState,
   onLanguageChange,
+  onColorChange,
   onReadyToggle,
   onStartGame,
   isLoadingGemini,
@@ -17,6 +19,7 @@ export function LobbyScreen({
   const everyoneReady = players.every((player) => player.isReady || player.isHost);
   const languageOptions = roomState?.supportedLanguages ?? LANGUAGE_OPTIONS;
   const selectedLanguage = roomState?.selectedLanguage ?? form.preferredLanguage;
+  const myColor = players.find((player) => player.id === roomState?.currentPlayerId)?.color ?? "purple";
 
   return (
     <div className="shell shell--lobby">
@@ -65,6 +68,23 @@ export function LobbyScreen({
             </button>
           </div>
 
+        {roomState ? (
+          <>
+            <p className="eyebrow" style={{ marginTop: 12, marginBottom: 6 }}>Avatar color</p>
+            <div className="color-picker">
+              {PLAYER_COLORS.map((color) => (
+                <button
+                  key={color.key}
+                  className={`color-swatch ${myColor === color.key ? "color-swatch--selected" : ""}`}
+                  style={{ background: `linear-gradient(180deg, ${color.top}, ${color.bottom})` }}
+                  onClick={() => onColorChange(color.key)}
+                  title={color.key}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+
           {error ? <p className="banner banner--danger">{error}</p> : null}
         </section>
 
@@ -105,7 +125,7 @@ export function LobbyScreen({
             <p className="eyebrow">Lobby</p>
             <h2>{roomState ? `Room ${roomState.roomId}` : "No active room"}</h2>
           </div>
-          {roomState ? (
+          {roomState && !isHost ? (
             <button className="button-secondary" onClick={() => onReadyToggle()}>
               {players.find((player) => player.id === roomState.currentPlayerId)?.isReady ? "Unready" : "Ready Up"}
             </button>
@@ -114,12 +134,21 @@ export function LobbyScreen({
 
         <div className="player-list">
           {players.length === 0 ? <p>Join or create a room to see the crew.</p> : null}
-          {players.map((player) => (
-            <div className="player-row" key={player.id}>
-              <span>{player.name}</span>
-              <span>{player.isHost ? "Host" : player.isReady ? "Ready" : "Waiting"}</span>
-            </div>
-          ))}
+          {players.map((player) => {
+            const c = getColorByKey(player.color);
+            return (
+              <div className="player-row" key={player.id}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <i
+                    className="player-color-dot"
+                    style={{ background: `linear-gradient(180deg, ${c.top}, ${c.bottom})` }}
+                  />
+                  {player.name}
+                </span>
+                <span>{player.isHost ? "Host" : player.isReady ? "Ready" : "Waiting"}</span>
+              </div>
+            );
+          })}
         </div>
 
         {isHost && players.length >= 3 ? (

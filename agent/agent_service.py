@@ -22,7 +22,6 @@ import os
 import json
 import asyncio
 import logging
-import traceback
 from typing import List, Literal, Optional
 from contextlib import asynccontextmanager
 
@@ -35,11 +34,29 @@ load_dotenv()
 
 # Suppress Railtracks verbose logging (it uses its own "RT" logger, not the root logger)
 os.environ.setdefault("RT_LOG_LEVEL", "ERROR")
+# Suppress LiteLLM print()-based spam (Give Feedback / debug messages)
+os.environ.setdefault("LITELLM_LOG", "ERROR")
 
 from pydantic import BaseModel, Field
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import railtracks as rt
+
+# Silence LiteLLM verbose print() output
+try:
+    import litellm
+    litellm.suppress_debug_info = True
+    litellm.set_verbose = False
+except Exception:
+    pass
+
+# Force-silence all noisy loggers after import (env var alone is unreliable)
+for _logger_name in list(logging.Logger.manager.loggerDict):
+    if any(_logger_name.startswith(p) for p in ("RT", "railtracks", "google", "httpx", "httpcore", "litellm", "LiteLLM")):
+        logging.getLogger(_logger_name).setLevel(logging.CRITICAL)
+logging.getLogger("RT").setLevel(logging.CRITICAL)
+logging.getLogger("LiteLLM").setLevel(logging.CRITICAL)
+logging.getLogger("litellm").setLevel(logging.CRITICAL)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  PYDANTIC MODELS — Structured Output (Hackathon Section 4)
@@ -169,11 +186,6 @@ SYNTAX_GUIDES = {
 def get_syntax_guide(language: str) -> str:
     """Get OOP syntax reference for a programming language."""
     return SYNTAX_GUIDES.get(language, SYNTAX_GUIDES["javascript"])
-
-
-def escape_prompt_text(value: str) -> str:
-    """Escape braces so Railtracks prompt templating doesn't parse code blocks as placeholders."""
-    return str(value or "").replace("{", "{{").replace("}", "}}")
 
 
 @rt.function_node
@@ -336,6 +348,16 @@ app.add_middleware(
 )
 
 
+def _short_error(e):
+    """Return first non-empty line of error, capped at 200 chars."""
+    msg = str(e).strip()
+    first_line = next((line for line in msg.split("\n") if line.strip()), "")
+    if first_line:
+        return first_line[:200]
+    # Fallback: use exception type + repr if str() was empty
+    return f"{type(e).__name__}: {repr(e)}"[:200]
+
+
 async def call_with_retry(agent, prompt, max_retries=2):
     """Call a Railtracks agent with retry logic for transient errors."""
     for attempt in range(max_retries + 1):
@@ -353,7 +375,6 @@ async def call_with_retry(agent, prompt, max_retries=2):
                 wait_time = 5 * (attempt + 1)  # 5s, 10s
                 await asyncio.sleep(wait_time)
             else:
-                logger.error(f"Agent '{agent.name}' failed: {e}")
                 raise
 
 
@@ -371,7 +392,7 @@ async def generate_task(request: GenerateTaskRequest):
     a fully typed CodingTask object with prompt, starter code, solution, and checks.
     """
     try:
-        syntax = escape_prompt_text(get_syntax_guide(request.language))
+        syntax = get_syntax_guide(request.language)
         prompt = (
             f"Generate a {request.task_type} coding task in {request.language}.\n\n"
             f"Language syntax reference:\n{syntax}\n\n"
@@ -391,8 +412,8 @@ async def generate_task(request: GenerateTaskRequest):
             "task": task.model_dump()
         }
     except Exception as e:
-        logger.error(f"/api/generate-task failed: {e}")
-        return {"ok": False, "error": str(e)}
+        logger.error(f"/api/generate-task failed: {_short_error(e)}")
+        return {"ok": False, "error": _short_error(e)}
 
 
 # ── Endpoint 2: Get imposter sabotage hints ──────────────────────────────────
@@ -404,12 +425,10 @@ async def get_imposter_hints(request: ImposterHintsRequest):
     a plausible but inefficient/bad-practice code variant.
     """
     try:
-        safe_prompt = escape_prompt_text(request.prompt)
-        safe_code = escape_prompt_text(request.current_code)
         prompt = (
             f"Task type: {request.task_type} in {request.language}.\n"
-            f"Task prompt: {safe_prompt}\n\n"
-            f"Current code:\n{safe_code}\n\n"
+            f"Task prompt: {request.prompt}\n\n"
+            f"Current code:\n{request.current_code}\n\n"
             f"Rewrite the code above so it looks like real work but uses bad practices "
             f"or is subtly inefficient. Return the full file content as code_snippet."
         )
@@ -422,17 +441,15 @@ async def get_imposter_hints(request: ImposterHintsRequest):
             "hints": [hint.model_dump()]
         }
     except Exception as e:
-        logger.error(f"/api/imposter-hints failed: {e}")
-        # Fallback: return current code with a tip so the imposter isn't stuck
-        if request.current_code.strip():
-            return {
-                "ok": True,
-                "hints": [{
-                    "code_snippet": request.current_code,
-                    "bad_practice": "AI generation failed. Try adding unnecessary complexity or redundant logic yourself."
-                }]
-            }
-        return {"ok": False, "error": str(e)}
+        logger.error(f"/api/imposter-hints failed: {_short_error(e)}")
+        # Fallback: always return a hint so the imposter panel still shows up
+        return {
+            "ok": True,
+            "hints": [{
+                "code_snippet": request.current_code or "// AI hint unavailable",
+                "bad_practice": "AI generation failed. Try adding unnecessary complexity or redundant logic yourself."
+            }]
+        }
 
 
 # ── Endpoint 3: AI code verification ─────────────────────────────────────────
@@ -444,12 +461,10 @@ async def verify_code(request: VerifyCodeRequest):
     implements the OOP concept, providing detailed feedback.
     """
     try:
-        safe_task_prompt = escape_prompt_text(request.task_prompt)
-        safe_code = escape_prompt_text(request.code)
         prompt = (
             f"Verify this {request.task_type} code in {request.language}.\n\n"
-            f"Task: {safe_task_prompt}\n\n"
-            f"Submitted code:\n```\n{safe_code}\n```\n\n"
+            f"Task: {request.task_prompt}\n\n"
+            f"Submitted code:\n```\n{request.code}\n```\n\n"
             f"Does this code correctly implement the {request.task_type} concept? "
             f"Check for proper OOP usage."
         )
@@ -462,8 +477,8 @@ async def verify_code(request: VerifyCodeRequest):
             "verification": verification.model_dump()
         }
     except Exception as e:
-        logger.error(f"/api/verify-code failed: {e}")
-        return {"ok": False, "error": str(e)}
+        logger.error(f"/api/verify-code failed: {_short_error(e)}")
+        return {"ok": False, "error": _short_error(e)}
 
 
 # ── Endpoint 4: Meeting behavior analysis (Add-on Feature) ──────────────────
@@ -505,20 +520,37 @@ async def meeting_insights(request: MeetingInsightRequest):
             "insight": insight.model_dump()
         }
     except Exception as e:
-        logger.error(f"/api/meeting-insights failed: {e}")
-        return {"ok": False, "error": str(e)}
+        logger.error(f"/api/meeting-insights failed: {_short_error(e)}")
+        return {"ok": False, "error": _short_error(e)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  SERVER ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
+async def _startup_llm_check():
+    """Quick LLM health check on startup — prints the real error if Gemini is broken."""
+    try:
+        import litellm
+        response = await litellm.acompletion(
+            model="gemini/gemini-2.5-flash",
+            messages=[{"role": "user", "content": "Say OK"}],
+            max_tokens=5,
+        )
+        print(f"  LLM check: OK (Gemini responding)")
+    except Exception as e:
+        print(f"  LLM check: FAILED — {type(e).__name__}: {e}")
+        print(f"  (API key loaded: {'GEMINI_API_KEY' in os.environ})")
+
+
 if __name__ == "__main__":
     import uvicorn
+    import asyncio
     print("\n=== Code Sus AI Agent Service ===")
     print("Framework: Railtracks (https://railtownai.github.io/railtracks/)")
     print("LLM: Google Gemini 2.5 Flash (free tier)")
     print("Agents: Task Generator, Imposter Advisor, Code Verifier, Meeting Analyst")
+    asyncio.run(_startup_llm_check())
     print("Endpoints:")
     print("  POST /api/generate-task      - Generate AI coding tasks")
     print("  POST /api/imposter-hints     - Get imposter sabotage suggestions")

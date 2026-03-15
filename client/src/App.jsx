@@ -195,6 +195,17 @@ export default function App() {
     }
   }
 
+  async function changeColor(color) {
+    if (!roomState) {
+      return;
+    }
+
+    const response = await emitWithAck("set_color", { color });
+    if (!response.ok) {
+      setError(response.error);
+    }
+  }
+
   async function startGame() {
     setError("");
     setGeminiLoadingScreen(true);
@@ -434,6 +445,7 @@ export default function App() {
           onJoinRoom={joinRoom}
           roomState={roomState}
           onLanguageChange={changeLanguage}
+          onColorChange={changeColor}
           onReadyToggle={toggleReady}
           onStartGame={startGame}
           isLoadingGemini={geminiLoadingScreen}

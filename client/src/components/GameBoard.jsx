@@ -1,5 +1,6 @@
 // No static map exports used anymore
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getColorByKey } from "../data/playerColors.js";
 
 const MOVE_STEP = 8;
 
@@ -27,6 +28,8 @@ export function GameBoard({
   const blackoutActiveSeconds = Math.ceil(blackoutActiveMs / 1000);
   const matchRemainingMs = Math.max(0, (roomState.matchDeadline ?? 0) - now);
   const matchRemainingSeconds = Math.ceil(matchRemainingMs / 1000);
+  const meetingCooldownMs = Math.max(0, (roomState.meetingCooldownUntil ?? 0) - now);
+  const meetingCooldownSeconds = Math.ceil(meetingCooldownMs / 1000);
   const nearbyStation = useMemo(() => {
     if (!me) return null;
     return roomState.map.stations.find(
@@ -151,16 +154,25 @@ export function GameBoard({
           })}
 
           {/* ── Player avatars ────────────────────────────────────── */}
-          {roomState.players.map((player) => (
-            <div
-              key={player.id}
-              className={`avatar ${player.id === roomState.currentPlayerId ? "avatar--self" : ""} ${!player.isAlive ? "avatar--ghost" : ""}`}
-              style={{ left: player.x - 16, top: player.y - 16 }}
-            >
-              <div className="avatar-body" />
-              <span>{player.name}</span>
-            </div>
-          ))}
+          {roomState.players.map((player) => {
+            const c = getColorByKey(player.color);
+            return (
+              <div
+                key={player.id}
+                className={`avatar ${!player.isAlive ? "avatar--ghost" : ""}`}
+                style={{ left: player.x - 16, top: player.y - 16 }}
+              >
+                <div
+                  className="avatar-body"
+                  style={{
+                    background: `linear-gradient(180deg, ${c.top}, ${c.bottom})`,
+                    boxShadow: `0 0 10px ${c.glow}`
+                  }}
+                />
+                <span>{player.name}</span>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -220,8 +232,8 @@ export function GameBoard({
             <button disabled={!nearbyStation || !me?.isAlive} onClick={() => onOpenTask(nearbyStation?.id)}>
               {nearbyStation ? `Use ${nearbyStation.label}` : "Move near a task station"}
             </button>
-            <button className="button-secondary" disabled={!me?.isAlive || roomState.meeting} onClick={onCallMeeting}>
-              Call Meeting
+            <button className="button-secondary" disabled={!me?.isAlive || roomState.meeting || meetingCooldownMs > 0} onClick={onCallMeeting}>
+              {meetingCooldownMs > 0 ? `Meeting ${meetingCooldownSeconds}s` : "Call Meeting"}
             </button>
             {roomState.viewerRole === "Imposter" ? (
               <>
@@ -248,14 +260,23 @@ export function GameBoard({
         <div className="panel">
           <p className="eyebrow">System Contributors</p>
           <div className="player-list">
-            {roomState.players.map((player) => (
-              <div className="player-row" key={player.id}>
-                <span>{player.name}</span>
-                <span style={{ color: player.isAlive ? "var(--accent-cyan)" : "var(--text-dim)", fontSize: "0.82rem" }}>
-                  {player.isAlive ? `${player.completedTasks.length} tasks` : "Ejected"}
-                </span>
-              </div>
-            ))}
+            {roomState.players.map((player) => {
+              const pc = getColorByKey(player.color);
+              return (
+                <div className="player-row" key={player.id}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <i
+                      className="player-color-dot"
+                      style={{ background: `linear-gradient(180deg, ${pc.top}, ${pc.bottom})` }}
+                    />
+                    {player.name}
+                  </span>
+                  <span style={{ color: player.isAlive ? "var(--accent-cyan)" : "var(--text-dim)", fontSize: "0.82rem" }}>
+                    {player.isAlive ? `${player.completedTasks.length} tasks` : "Ejected"}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </aside>

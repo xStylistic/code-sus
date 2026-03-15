@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getColorByKey } from "../data/playerColors.js";
 
 export function MeetingModal({ roomState, onVote, meetingInsights, onRequestInsights, aiLoading }) {
   const meeting = roomState?.meeting;
@@ -62,11 +63,18 @@ export function MeetingModal({ roomState, onVote, meetingInsights, onRequestInsi
         ) : null}
 
         <div className="vote-grid">
-          {alivePlayers.map((player) => (
-            <button key={player.id} disabled={alreadyVoted} onClick={() => onVote(player.id)}>
-              {player.name}
-            </button>
-          ))}
+          {alivePlayers.map((player) => {
+            const c = getColorByKey(player.color);
+            return (
+              <button key={player.id} disabled={alreadyVoted} onClick={() => onVote(player.id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <i
+                  className="player-color-dot"
+                  style={{ background: `linear-gradient(180deg, ${c.top}, ${c.bottom})` }}
+                />
+                {player.name}
+              </button>
+            );
+          })}
           <button className="button-secondary" disabled={alreadyVoted} onClick={() => onVote("skip")}>
             Skip Vote
           </button>

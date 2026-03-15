@@ -66,6 +66,17 @@ io.on("connection", (socket) => {
     syncRoom(room.roomId);
   });
 
+  socket.on("set_color", ({ color }, callback = () => {}) => {
+    const room = getCurrentRoom(socket.id);
+    if (!room?.setPlayerColor(socket.id, color)) {
+      callback({ ok: false, error: "Unable to update color." });
+      return;
+    }
+
+    callback({ ok: true });
+    syncRoom(room.roomId);
+  });
+
   socket.on("set_language", ({ language }, callback = () => {}) => {
     const room = getCurrentRoom(socket.id);
     if (!room?.setPlayerLanguage(socket.id, language)) {

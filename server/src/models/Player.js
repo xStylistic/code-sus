@@ -11,6 +11,7 @@ export class Player {
     this.role = Role.CODEMATE;
     this.x = 80 + Math.round(Math.random() * 80);
     this.y = 80 + Math.round(Math.random() * 80);
+    this.color = "purple";
     this.isAlive = true;
     this.completedTasks = [];
   }
@@ -37,6 +38,7 @@ export class Player {
       role: revealRole ? this.role : null,
       x: this.x,
       y: this.y,
+      color: this.color,
       isAlive: this.isAlive,
       completedTasks: this.completedTasks
     };

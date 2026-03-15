@@ -1,127 +1,85 @@
 # Code Sus
 
-`Code Sus` is a multiplayer social deduction MVP inspired by Among Us, but themed around object-oriented programming. Players move around a shared ship, solve short coding-focused OOP tasks, and try to catch the imposter who sabotages systems by injecting bugs.
+A multiplayer social deduction game where players solve OOP coding tasks on a shared ship while trying to find the hacker among them. Think Among Us, but with code.
 
-## Folder Structure
+3-8 players join a room, get assigned roles (Codemate or Hacker), and race to either complete all coding tasks or figure out who's been sabotaging the codebase.
 
-```text
-code-sus/
-├── client/
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       ├── components/
-│       │   ├── EndScreen.jsx
-│       │   ├── GameBoard.jsx
-│       │   ├── LobbyScreen.jsx
-│       │   ├── MeetingModal.jsx
-│       │   ├── RoleRevealModal.jsx
-│       │   └── TaskModal.jsx
-│       ├── data/
-│       │   ├── languages.js
-│       │   └── mapData.js
-│       └── styles/
-│           └── global.css
-├── server/
-│   ├── package.json
-│   └── src/
-│       ├── data/
-│       │   ├── languages.js
-│       │   └── taskTemplates.js
-│       ├── game/
-│       │   └── taskRunner.js
-│       ├── index.js
-│       └── models/
-│           ├── GameRoom.js
-│           ├── MeetingManager.js
-│           ├── Player.js
-│           ├── Role.js
-│           ├── Sabotage.js
-│           ├── Task.js
-│           └── VoteManager.js
-└── package.json
+## Getting Started
+
+**Prerequisites:** Node.js 18+, Python 3.10+
+
+### 1. Set up the AI agent service
+
+```bash
+cd agent
+pip install -r requirements.txt
 ```
 
-## Gameplay MVP
+Create a `.env` file in the `agent/` folder with your Gemini API key:
 
-- 3 to 8 players can create or join a room with a room code.
-- The host starts the match once everyone is ready.
-- The server assigns one imposter and keeps the game state authoritative.
-- The host picks one shared coding language in the lobby: `JavaScript`, `Python`, `Java`, `C++`, or `C`.
-- Codemates complete 3 real OOP tasks in that shared language: inheritance, polymorphism, and encapsulation.
-- The imposter can trigger `blackout` and `code_corruption`.
-- Any alive player can call a meeting and submit one vote.
-- The match ends when all tasks are complete, the imposter is eliminated, or sabotage pressure reaches 4 / crew parity is reached.
-- When a match starts, each player gets a role reveal modal: `YOU'RE A CODEMATE` or `YOU'RE THE IMPOSTER`.
-- Task code is shared per room, so players can see teammates editing the same code live.
-- Players who are voted out become spectators and can no longer act.
+```
+GEMINI_API_KEY=your_key_here
+```
 
-## Multiplayer Flow
+### 2. Install Node dependencies
 
-- `create_room` and `join_room` create a `GameRoom` and add `Player` instances.
-- `player_ready` and `start_game` manage the lobby flow.
-- `set_language` lets only the host choose the room's shared coding language before the match starts.
-- `player_move` updates player positions on the server, then broadcasts `sync_game_state`.
-- `interact_task` asks the server for the current coding prompt and starter code near a station.
-- `update_task_code` broadcasts live code edits so all open task windows stay synchronized.
-- `run_task_code` runs visible checks on the server with a sandboxed validator.
-- `submit_task` runs hidden validation server-side and updates shared progress only if the code passes.
-- `trigger_sabotage` activates blackout or task corruption on the server.
-- `call_meeting` and `submit_vote` run the meeting and voting flow.
-- `sync_game_state` is emitted to each socket with viewer-safe role data.
+From the project root:
 
-## Sample OOP Tasks
+```bash
+npm install
+```
 
-- `Inheritance Bay`: repair the base class hull by implementing inheritance correctly.
-- `Polymorphism Lab`: restore the dispatch engine with overridden area behavior.
-- `Encapsulation Vault`: lock the state core and prevent unsafe access.
+### 3. Run everything
 
-The task definitions live in [server/src/data/taskTemplates.js](/Users/bonnychen/Documents/code-sus/server/src/data/taskTemplates.js).
-The server-side task validator lives in [server/src/game/taskRunner.js](/Users/bonnychen/Documents/code-sus/server/src/game/taskRunner.js).
+```bash
+npm run dev:all
+```
 
-## Local Setup
+This starts all three services at once:
+- **Client** at `http://localhost:5173`
+- **Server** at `http://localhost:3001`
+- **Agent** at `http://localhost:5001`
 
-1. Install dependencies from the repo root:
+Open multiple browser tabs to simulate players. For LAN play, open `http://YOUR_LOCAL_IP:5173` on other devices connected to the same network.
 
-   ```bash
-   npm install
-   ```
+> The game works without the agent service running — AI features just won't be available.
 
-2. Start both apps:
+## How It Works
 
-   ```bash
-   npm run dev
-   ```
+**Lobby** — The host creates a room and shares the room code. Players join, pick a codename and avatar color, and the host picks a shared programming language (JavaScript, Python, Java, C++, or C). Once 3+ players are ready, the host launches the match.
 
-3. Open `http://localhost:5173`.
+**Gameplay** — Players move around a 2D ship map with OOP-themed rooms (Inheritance Bay, Polymorphism Lab, Encapsulation Vault). Codemates work on real coding tasks at stations — the code editor is shared, so you can see teammates typing in real time with live cursors. The Hacker gets a fake task view and can trigger sabotages (blackout, code corruption) to slow things down.
 
-4. Run multiple browser tabs or windows to simulate 3 to 8 players.
+**Meetings** — Any alive player can call an emergency meeting. Everyone discusses and votes to eject someone. There's an optional AI analysis button that reads player behavior and gives discussion prompts.
 
-## Testing Across Devices On One Wi-Fi Network
+**Win conditions:**
+- Codemates win by completing all tasks
+- Codemates win by voting out the Hacker
+- Hacker wins if sabotage pressure hits 4 or they reach crew parity
 
-1. Start the app with:
+## AI Features (Powered by Gemini)
 
-   ```bash
-   npm run dev
-   ```
+The agent service uses [Railtracks](https://railtownai.github.io/railtracks/) to run four AI agents:
 
-2. Find your laptop's local IP address, for example `192.168.1.25`.
+- **Task Generator** — Creates unique OOP coding challenges each match with starter code, solutions, and validation checks
+- **Imposter Advisor** — Gives the Hacker AI-generated sabotage code that looks real but uses bad practices
+- **Code Verifier** — Automatically reviews submissions and gives feedback on correctness and code quality
+- **Meeting Analyst** — Analyzes player behavior during meetings and suggests discussion prompts
 
-3. Open `http://YOUR_LOCAL_IP:5173` on each device on the same Wi-Fi network.
+After the match ends, players see an AI-generated code review summary with issues and fixes for each task they submitted, plus the optimal solutions revealed.
 
-4. The client automatically connects to `http://YOUR_LOCAL_IP:3001`, so no extra config is needed for LAN play.
+## Tech Stack
 
-If you later deploy the frontend and backend to different hosts, set `VITE_SERVER_URL` for the client build.
+| Layer | Tech |
+|-------|------|
+| Frontend | React, Vite |
+| Backend | Node.js, Express, Socket.IO |
+| AI Agent | Python, FastAPI, Railtracks, Gemini 2.0 Flash |
+| Task Execution | Node `vm` sandbox (JS), structural validation (Python/Java/C++/C) |
 
-## Notes
+## Local Network Play
 
-- Frontend: React + Vite.
-- Backend: Node.js + Express + Socket.IO.
-- JavaScript tasks are executed server-side in a Node `vm` sandbox with short timeouts.
-- Python, Java, C++, and C tasks use language-specific structural validation for this MVP.
-- Blackout lasts 10 seconds and also darkens the task work area while it is active.
-- The map is a single shared 2D board with labeled OOP-themed rooms.
-- The server is authoritative for room state, movement, tasks, sabotages, meetings, votes, and win conditions.
+1. Start with `npm run dev:all`
+2. Find your machine's local IP (e.g. `192.168.1.25`)
+3. Other devices on the same Wi-Fi open `http://YOUR_LOCAL_IP:5173`
+4. The client auto-connects to the server on the same host — no extra config needed
