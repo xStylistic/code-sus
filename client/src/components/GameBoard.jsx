@@ -128,7 +128,7 @@ export function GameBoard({
           {/* ── Task station buttons (bottom-center of each room) ── */}
           {roomState.map.stations.map((station) => {
             const task = roomState.tasks.find((t) => t.stationId === station.id);
-            const isDone = task?.status === "completed";
+            const isDone = Boolean(task?.completedBy);
             const isCorrupted = task?.corrupted;
             return (
               <button

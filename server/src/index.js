@@ -260,7 +260,20 @@ io.on("connection", (socket) => {
       task.prompt
     );
 
-    callback(result);
+    if (result?.ok && Array.isArray(result.hints) && result.hints.length > 0) {
+      callback(result);
+      return;
+    }
+
+    callback({
+      ok: true,
+      hints: [
+        {
+          code_snippet: currentCode,
+          bad_practice: "AI sabotage intel unavailable right now. Keep this code looking busy by adding small but unnecessary complexity."
+        }
+      ]
+    });
   });
 
   socket.on("request_ai_verify", async ({ taskId, code }, callback = () => {}) => {

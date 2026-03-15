@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { LobbyScreen } from "./components/LobbyScreen.jsx";
 import { GameBoard } from "./components/GameBoard.jsx";
@@ -57,7 +57,9 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [geminiLoadingScreen, setGeminiLoadingScreen] = useState(false);
   const [submitLoadingScreen, setSubmitLoadingScreen] = useState(false);
+  const [showSubmittedToast, setShowSubmittedToast] = useState(false);
   const [aiReviews, setAiReviews] = useState([]);
+  const submittedToastTimeoutRef = useRef(null);
 
   useEffect(() => {
     const handleSync = (state) => {
@@ -111,6 +113,14 @@ export default function App() {
       socket.off("sync_game_state", handleSync);
       socket.off("task_code_updated", handleTaskCodeUpdated);
       socket.off("task_cursor_updated", handleTaskCursorUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (submittedToastTimeoutRef.current) {
+        window.clearTimeout(submittedToastTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -358,6 +368,18 @@ export default function App() {
           setRunResult(null);
         }, 700);
       }
+
+      if (result.ok && !result.fake) {
+        resetOverlay();
+        setShowSubmittedToast(true);
+        if (submittedToastTimeoutRef.current) {
+          window.clearTimeout(submittedToastTimeoutRef.current);
+        }
+        submittedToastTimeoutRef.current = window.setTimeout(() => {
+          setShowSubmittedToast(false);
+          submittedToastTimeoutRef.current = null;
+        }, 2000);
+      }
     } finally {
       setSubmitLoadingScreen(false);
     }
@@ -465,6 +487,12 @@ export default function App() {
             <h3>{submitLoadingScreen ? "Submitting Solution..." : "Generating AI Challenges..."}</h3>
             <p>{submitLoadingScreen ? "Reviewing your code quality and correctness." : "Preparing tasks and sabotage intel for this match."}</p>
           </div>
+        </div>
+      ) : null}
+
+      {showSubmittedToast ? (
+        <div className="submitted-toast" role="status" aria-live="polite">
+          Task submitted successfully
         </div>
       ) : null}
     </div>
