@@ -16,7 +16,11 @@ const socket = io(defaultServerUrl, {
 });
 
 function formatGameCode(input, language = "javascript") {
-  const source = String(input ?? "").replace(/\r\n?/g, "\n");
+  let source = String(input ?? "").replace(/\r\n?/g, "\n");
+  // Fix literal \n from AI that weren't parsed as real newlines
+  if (!source.includes("\n") && source.includes("\\n")) {
+    source = source.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+  }
   if (!source.trim()) {
     return "";
   }
@@ -446,11 +450,11 @@ export default function App() {
       />
       {roomState?.state === "ended" ? <EndScreen roomState={roomState} aiReviews={aiReviews} onReset={() => window.location.reload()} /> : null}
 
-      {geminiLoadingScreen ? (
+      {geminiLoadingScreen || roomState?.state === "generating" ? (
         <div className="loading-screen" role="status" aria-live="polite" aria-label="Gemini loading">
           <div className="loading-screen-card">
             <div className="loading-spinner" />
-            <h3>Preparing Match</h3>
+            <h3>Generating AI Challenges...</h3>
           </div>
         </div>
       ) : null}

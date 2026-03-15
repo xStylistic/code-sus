@@ -3,8 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 const CURSOR_COLORS = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#ff6348", "#ff7f50", "#7bed9f", "#eccc68"];
 
 export function TaskModal({
-  task, code, onCodeChange, onCursorChange, onClose, onRun, onSubmit,
-  onFormat,
+  task, code, onCodeChange, onCursorChange, onClose, onSubmit,
   feedback, runResult, isBlackout, canBypassBlackout, isSpectator, currentPlayerId,
   imposterHints, aiVerification, aiError, aiLoading
 }) {
@@ -198,7 +197,7 @@ export function TaskModal({
               </div>
             ) : null}
 
-            {aiLoading && !aiVerification ? (
+            {!task.fakeOnly && aiLoading && !aiVerification ? (
               <div className="ai-verification">
                 <div className="task-panel-header">
                   <span>AI Review</span>
@@ -208,7 +207,7 @@ export function TaskModal({
               </div>
             ) : null}
 
-            {aiVerification ? (
+            {!task.fakeOnly && aiVerification ? (
               <div className="ai-verification">
                 <div className="task-panel-header">
                   <span>AI Review</span>
@@ -230,7 +229,7 @@ export function TaskModal({
               </div>
             ) : null}
 
-            {aiError ? <p className="banner banner--danger">AI Error: {aiError}</p> : null}
+            {!task.fakeOnly && aiError ? <p className="banner banner--danger">AI Error: {aiError}</p> : null}
 
             {feedback ? <p className={`banner ${feedback.ok ? "" : "banner--danger"}`}>{feedback.message}</p> : null}
           </section>
@@ -277,12 +276,6 @@ export function TaskModal({
             title="Reset code back to the original starter template"
           >
             Reset
-          </button>
-          <button className="button-secondary" disabled={isSpectator} onClick={onFormat}>
-            Format
-          </button>
-          <button className="button-secondary" disabled={isSpectator} onClick={() => onRun(task.id, { code })}>
-            Run Code
           </button>
           <button disabled={isSpectator} onClick={() => onSubmit(task.id, { code })}>Submit Task</button>
         </div>

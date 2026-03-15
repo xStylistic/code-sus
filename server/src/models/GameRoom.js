@@ -7,7 +7,7 @@ import { cloneTaskTemplates } from "../data/taskTemplates.js";
 import { pickRandomLayout } from "../data/mapLayouts.js";
 import { evaluateTaskCode } from "../game/taskRunner.js";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "../data/languages.js";
-import { generateTask, getImposterHints, verifyCode } from "../services/agentBridge.js";
+import { generateTask, verifyCode } from "../services/agentBridge.js";
 
 const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 3;
@@ -131,11 +131,11 @@ export class GameRoom {
     return { ok: true };
   }
 
-  async startGame() {
+  async startGame(onReady) {
     this.clearMeetingTimer();
-    this.state = "in_game";
+    this.state = "generating";
     this.winner = null;
-    this.statusText = "Complete tasks and watch for sabotage";
+    this.statusText = "Generating AI challenges...";
     this.taskProgress = 0;
     this.disruption = 0;
     this.meeting = null;
@@ -167,20 +167,27 @@ export class GameRoom {
     const imposterIndex = Math.floor(Math.random() * playerList.length);
     playerList[imposterIndex].role = Role.IMPOSTER;
 
+    // Notify caller so they can sync "generating" state to all clients
+    if (onReady) onReady();
+
     await this.generateAiChallengesForMatch();
+    this.state = "in_game";
+    this.statusText = "Complete tasks and watch for sabotage";
   }
 
   async generateAiChallengesForMatch() {
-    for (const task of this.tasks) {
-      const language = this.selectedLanguage;
+    const language = this.selectedLanguage;
+
+    // Generate all tasks in parallel for speed
+    await Promise.all(this.tasks.map(async (task) => {
       const languageTask = task.languages?.[language] ?? task.languages?.javascript;
       if (!languageTask) {
-        continue;
+        return;
       }
 
       const generated = await generateTask(task.type, language);
       if (!generated?.ok || !generated.task) {
-        continue;
+        return;
       }
 
       const generatedTask = generated.task;
@@ -190,18 +197,13 @@ export class GameRoom {
         ? generatedTask.visible_checks
         : task.visibleChecks;
 
-      languageTask.starterCode = generatedTask.starter_code || languageTask.starterCode;
+      languageTask.starterCode = fixCodeNewlines(generatedTask.starter_code) || languageTask.starterCode;
       languageTask.validationPatterns = Array.isArray(generatedTask.validation_patterns)
         ? generatedTask.validation_patterns
         : [];
-      languageTask.optimalSolution = generatedTask.solution_code || "";
+      languageTask.optimalSolution = fixCodeNewlines(generatedTask.solution_code) || "";
       task.aiGenerated = true;
-
-      const sabotage = await getImposterHints(task.type, language, languageTask.starterCode, task.prompt);
-      if (sabotage?.ok && Array.isArray(sabotage.hints) && sabotage.hints[0]?.code_snippet) {
-        languageTask.corruptedStarterCode = sabotage.hints[0].code_snippet;
-      }
-    }
+    }));
 
     for (const task of this.tasks) {
       this.sharedTaskCode[task.id] = this.getStarterCode(task);
@@ -710,6 +712,12 @@ GameRoom.prototype.getOptimalSolution = function getOptimalSolution(task) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function fixCodeNewlines(code) {
+  if (!code || code.includes('\n')) return code;
+  // AI sometimes returns literal \n instead of real newlines in structured output
+  return code.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
 }
 
 function normalizeCode(source) {

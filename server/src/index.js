@@ -119,7 +119,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    await room.startGame();
+    await room.startGame(() => {
+      // Sync "generating" state to all clients so they see the loading screen
+      syncRoom(room.roomId);
+    });
     callback({ ok: true });
     syncRoom(room.roomId);
   });
