@@ -33,6 +33,9 @@ logger.setLevel(logging.ERROR)
 from dotenv import load_dotenv
 load_dotenv()
 
+# Suppress Railtracks verbose logging (it uses its own "RT" logger, not the root logger)
+os.environ.setdefault("RT_LOG_LEVEL", "ERROR")
+
 from pydantic import BaseModel, Field
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
