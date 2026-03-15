@@ -177,6 +177,11 @@ def get_syntax_guide(language: str) -> str:
     return SYNTAX_GUIDES.get(language, SYNTAX_GUIDES["javascript"])
 
 
+def escape_prompt_text(value: str) -> str:
+    """Escape braces so Railtracks prompt templating doesn't parse code blocks as placeholders."""
+    return str(value or "").replace("{", "{{").replace("}", "}}")
+
+
 @rt.function_node
 def validate_code_patterns(code: str, patterns: list) -> dict:
     """Check if code contains all required patterns for task validation.
@@ -371,7 +376,7 @@ async def generate_task(request: GenerateTaskRequest):
     a fully typed CodingTask object with prompt, starter code, solution, and checks.
     """
     try:
-        syntax = get_syntax_guide(request.language)
+        syntax = escape_prompt_text(get_syntax_guide(request.language))
         prompt = (
             f"Generate a {request.task_type} coding task in {request.language}.\n\n"
             f"Language syntax reference:\n{syntax}\n\n"
@@ -404,10 +409,12 @@ async def get_imposter_hints(request: ImposterHintsRequest):
     a plausible but inefficient/bad-practice code variant.
     """
     try:
+        safe_prompt = escape_prompt_text(request.prompt)
+        safe_code = escape_prompt_text(request.current_code)
         prompt = (
             f"Task type: {request.task_type} in {request.language}.\n"
-            f"Task prompt: {request.prompt}\n\n"
-            f"Current code:\n{request.current_code}\n\n"
+            f"Task prompt: {safe_prompt}\n\n"
+            f"Current code:\n{safe_code}\n\n"
             f"Rewrite the code above so it looks like real work but uses bad practices "
             f"or is subtly inefficient. Return the full file content as code_snippet."
         )
@@ -442,10 +449,12 @@ async def verify_code(request: VerifyCodeRequest):
     implements the OOP concept, providing detailed feedback.
     """
     try:
+        safe_task_prompt = escape_prompt_text(request.task_prompt)
+        safe_code = escape_prompt_text(request.code)
         prompt = (
             f"Verify this {request.task_type} code in {request.language}.\n\n"
-            f"Task: {request.task_prompt}\n\n"
-            f"Submitted code:\n```\n{request.code}\n```\n\n"
+            f"Task: {safe_task_prompt}\n\n"
+            f"Submitted code:\n```\n{safe_code}\n```\n\n"
             f"Does this code correctly implement the {request.task_type} concept? "
             f"Check for proper OOP usage."
         )

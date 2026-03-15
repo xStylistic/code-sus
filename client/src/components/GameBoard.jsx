@@ -82,8 +82,6 @@ export function GameBoard({
           </div>
           <div className="map-legend">
             <span><i className="legend-dot legend-dot--task" /> Task node</span>
-            <span><i className="legend-dot legend-dot--bug" /> Corrupted</span>
-            <span><i className="legend-dot legend-dot--player" /> Crew</span>
           </div>
         </div>
 

@@ -15,6 +15,8 @@ const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
 const BLACKOUT_COOLDOWN_MS = 10000;
 const OPTIMAL_SIMILARITY_THRESHOLD = 0.9;
+const AI_VERIFY_RETRY_BASE_MS = 1500;
+const AI_VERIFY_RETRY_MAX_MS = 12000;
 
 export class GameRoom {
   constructor(roomId, hostSocketId, hostName, preferredLanguage = "javascript") {
@@ -357,30 +359,17 @@ export class GameRoom {
     }
 
     const submittedCode = response?.code ?? this.sharedTaskCode[task.id];
-    const result = this.evaluateAgainstOptimal(task, submittedCode) ?? evaluateTaskCode(task, this.selectedLanguage, submittedCode);
-    if (!result.passed) {
-      return {
-        ok: false,
-        error: result.summary,
-        result
-      };
-    }
-
-    const aiResult = await verifyCode(task.type, this.selectedLanguage, submittedCode, task.prompt);
-    if (!aiResult?.ok || !aiResult.verification) {
-      return {
-        ok: false,
-        error: aiResult?.error || "AI verification unavailable.",
-        result,
-        aiVerification: null
-      };
-    }
+    const aiResult = await this.verifyCodeUntilSuccess(task, submittedCode);
 
     if (!aiResult.verification.is_correct) {
       return {
         ok: false,
         error: aiResult.verification.explanation || "AI review rejected this solution.",
-        result,
+        result: {
+          passed: false,
+          summary: aiResult.verification.explanation || "AI review rejected this solution.",
+          results: []
+        },
         aiVerification: aiResult.verification
       };
     }
@@ -396,7 +385,32 @@ export class GameRoom {
     }
 
     this.evaluateWinConditions();
-    return { ok: true, fake: false, message: "Task completed.", result, aiVerification: aiResult.verification };
+    return {
+      ok: true,
+      fake: false,
+      message: "Task completed.",
+      result: {
+        passed: true,
+        summary: aiResult.verification.explanation || "AI review approved this solution.",
+        results: []
+      },
+      aiVerification: aiResult.verification
+    };
+  }
+
+  async verifyCodeUntilSuccess(task, submittedCode) {
+    let attempt = 0;
+
+    while (true) {
+      const aiResult = await verifyCode(task.type, this.selectedLanguage, submittedCode, task.prompt);
+      if (aiResult?.ok && aiResult.verification) {
+        return aiResult;
+      }
+
+      attempt += 1;
+      const delayMs = getRetryDelayMs(aiResult?.error, attempt);
+      await sleep(delayMs);
+    }
   }
 
   triggerSabotage(socketId, type) {
@@ -712,6 +726,23 @@ GameRoom.prototype.getOptimalSolution = function getOptimalSolution(task) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getRetryDelayMs(errorMessage, attempt) {
+  const message = String(errorMessage ?? "");
+  const retryInMatch = message.match(/retry in\s+([\d.]+)s/i);
+  if (retryInMatch) {
+    const retrySeconds = Number(retryInMatch[1]);
+    if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
+      return Math.ceil(retrySeconds * 1000);
+    }
+  }
+
+  return Math.min(AI_VERIFY_RETRY_BASE_MS * Math.max(1, attempt), AI_VERIFY_RETRY_MAX_MS);
 }
 
 function fixCodeNewlines(code) {

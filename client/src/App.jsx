@@ -56,6 +56,7 @@ export default function App() {
   const [meetingInsights, setMeetingInsights] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [geminiLoadingScreen, setGeminiLoadingScreen] = useState(false);
+  const [submitLoadingScreen, setSubmitLoadingScreen] = useState(false);
   const [aiReviews, setAiReviews] = useState([]);
 
   useEffect(() => {
@@ -324,36 +325,41 @@ export default function App() {
   }
 
   async function submitTask(taskId, response) {
-    const result = await emitWithAck("submit_task", { taskId, response });
-    setRunResult(result.result ?? null);
+    setSubmitLoadingScreen(true);
+    try {
+      const result = await emitWithAck("submit_task", { taskId, response });
+      setRunResult(result.result ?? null);
 
-    if (result.aiVerification) {
-      setAiVerification(result.aiVerification);
-      setAiVerificationByTask((current) => ({
-        ...current,
-        [taskId]: result.aiVerification
-      }));
-    }
+      if (result.aiVerification) {
+        setAiVerification(result.aiVerification);
+        setAiVerificationByTask((current) => ({
+          ...current,
+          [taskId]: result.aiVerification
+        }));
+      }
 
-    if (!result.ok) {
-      setFeedback({ ok: false, message: result.error });
-    } else {
-      setFeedback({ ok: true, message: result.message });
-    }
+      if (!result.ok) {
+        setFeedback({ ok: false, message: result.error });
+      } else {
+        setFeedback({ ok: true, message: result.message });
+      }
 
-    // Auto-trigger AI review for codemates on every submission (pass or fail)
-    const currentTask = task;
-    if (currentTask && !currentTask.fakeOnly && result.ok && result.aiVerification) {
-      setAiReviews((prev) => [...prev, { taskTitle: currentTask.title, ...result.aiVerification }]);
-    } else if (currentTask && !currentTask.fakeOnly && !result.aiVerification) {
-      autoAiReview(taskId, response.code, currentTask.title);
-    } else if (result.ok) {
-      // Imposter faking — just close after a short delay
-      window.setTimeout(() => {
-        setTask(null);
-        setFeedback(null);
-        setRunResult(null);
-      }, 700);
+      // Auto-trigger AI review for codemates on every submission (pass or fail)
+      const currentTask = task;
+      if (currentTask && !currentTask.fakeOnly && result.ok && result.aiVerification) {
+        setAiReviews((prev) => [...prev, { taskTitle: currentTask.title, ...result.aiVerification }]);
+      } else if (currentTask && !currentTask.fakeOnly && !result.aiVerification) {
+        autoAiReview(taskId, response.code, currentTask.title);
+      } else if (result.ok) {
+        // Imposter faking — just close after a short delay
+        window.setTimeout(() => {
+          setTask(null);
+          setFeedback(null);
+          setRunResult(null);
+        }, 700);
+      }
+    } finally {
+      setSubmitLoadingScreen(false);
     }
   }
 
@@ -393,6 +399,7 @@ export default function App() {
     setImposterHints(null);
     setAiVerification(null);
     setAiError("");
+    setSubmitLoadingScreen(false);
   }
 
   return (
@@ -439,6 +446,7 @@ export default function App() {
         aiVerification={aiVerification}
         aiError={aiError}
         aiLoading={aiLoading}
+        isSubmitting={submitLoadingScreen}
       />
       <RoleRevealModal role={roleReveal} onClose={() => setRoleReveal(null)} />
       <MeetingModal
@@ -450,11 +458,12 @@ export default function App() {
       />
       {roomState?.state === "ended" ? <EndScreen roomState={roomState} aiReviews={aiReviews} onReset={() => window.location.reload()} /> : null}
 
-      {geminiLoadingScreen || roomState?.state === "generating" ? (
+      {geminiLoadingScreen || roomState?.state === "generating" || submitLoadingScreen ? (
         <div className="loading-screen" role="status" aria-live="polite" aria-label="Gemini loading">
           <div className="loading-screen-card">
             <div className="loading-spinner" />
-            <h3>Generating AI Challenges...</h3>
+            <h3>{submitLoadingScreen ? "Submitting Solution..." : "Generating AI Challenges..."}</h3>
+            <p>{submitLoadingScreen ? "Reviewing your code quality and correctness." : "Preparing tasks and sabotage intel for this match."}</p>
           </div>
         </div>
       ) : null}

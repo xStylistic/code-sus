@@ -5,7 +5,7 @@ const CURSOR_COLORS = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#ff6348", "#
 export function TaskModal({
   task, code, onCodeChange, onCursorChange, onClose, onSubmit,
   feedback, runResult, isBlackout, canBypassBlackout, isSpectator, currentPlayerId,
-  imposterHints, aiVerification, aiError, aiLoading
+  imposterHints, aiVerification, aiError, aiLoading, isSubmitting
 }) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
@@ -110,7 +110,7 @@ export function TaskModal({
             <p className="eyebrow">{task.type}</p>
             <h3>{task.title}</h3>
           </div>
-          <button className="button-secondary" onClick={onClose}>
+          <button className="button-secondary" onClick={onClose} disabled={isSubmitting}>
             Close
           </button>
         </div>
@@ -145,7 +145,7 @@ export function TaskModal({
                 onSelect={(event) => updateSelectionState(event.target)}
                 onKeyUp={(event) => updateSelectionState(event.target)}
                 onClick={(event) => updateSelectionState(event.target)}
-                disabled={isSpectator}
+                disabled={isSpectator || isSubmitting}
               />
               <div className="cursor-layer">
                 {remoteMarkers.map((marker) => (
@@ -271,13 +271,15 @@ export function TaskModal({
         <div className="button-row">
           <button
             className="button-secondary"
-            disabled={isSpectator}
+            disabled={isSpectator || isSubmitting}
             onClick={() => onCodeChange(task.starterCode)}
             title="Reset code back to the original starter template"
           >
             Reset
           </button>
-          <button disabled={isSpectator} onClick={() => onSubmit(task.id, { code })}>Submit Task</button>
+          <button disabled={isSpectator || isSubmitting} onClick={() => onSubmit(task.id, { code })}>
+            {isSubmitting ? "Submitting..." : "Submit Task"}
+          </button>
         </div>
       </div>
     </div>
