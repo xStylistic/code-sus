@@ -122,6 +122,9 @@ io.on("connection", (socket) => {
     await room.startGame(() => {
       // Sync "generating" state to all clients so they see the loading screen
       syncRoom(room.roomId);
+    }, () => {
+      // Sync immediately when the 5-minute match timer expires
+      syncRoom(room.roomId);
     });
     callback({ ok: true });
     syncRoom(room.roomId);

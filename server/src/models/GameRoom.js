@@ -14,6 +14,7 @@ const MIN_PLAYERS = 3;
 const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
 const BLACKOUT_COOLDOWN_MS = 10000;
+const MATCH_DURATION_MS = 1 * 60 * 1000;
 const OPTIMAL_SIMILARITY_THRESHOLD = 0.9;
 const AI_VERIFY_RETRY_BASE_MS = 1500;
 const AI_VERIFY_RETRY_MAX_MS = 12000;
@@ -39,6 +40,8 @@ export class GameRoom {
     this.statusText = "Waiting for players";
     this.scheduledActions = new Set();
     this.meetingTimer = null;
+    this.matchTimer = null;
+    this.matchDeadline = null;
 
     this.addPlayer(hostSocketId, hostName, true, preferredLanguage);
     // mapLayout is chosen fresh at startGame() each match
@@ -133,8 +136,9 @@ export class GameRoom {
     return { ok: true };
   }
 
-  async startGame(onReady) {
+  async startGame(onReady, onTimerExpired) {
     this.clearMeetingTimer();
+    this.clearMatchTimer();
     this.state = "generating";
     this.winner = null;
     this.statusText = "Generating AI challenges...";
@@ -144,6 +148,7 @@ export class GameRoom {
     this.activeSabotage = null;
     this.blackoutCooldownUntil = 0;
     this.corruptedTaskId = null;
+    this.matchDeadline = null;
     this.tasks = cloneTaskTemplates().map((taskTemplate) => new Task(taskTemplate));
     this.sharedTaskCode = {};
     this.taskEditors = {};
@@ -175,6 +180,27 @@ export class GameRoom {
     await this.generateAiChallengesForMatch();
     this.state = "in_game";
     this.statusText = "Complete tasks and watch for sabotage";
+    this.matchDeadline = Date.now() + MATCH_DURATION_MS;
+
+    const timer = setTimeout(() => {
+      if (this.state !== "in_game" || this.winner) {
+        return;
+      }
+
+      this.winner = "Imposter";
+      this.state = "ended";
+      this.statusText = "Time expired — Imposter win";
+      this.meeting = null;
+      this.activeSabotage = null;
+      this.corruptedTaskId = null;
+      this.clearMeetingTimer();
+      this.clearMatchTimer();
+      if (onTimerExpired) {
+        onTimerExpired();
+      }
+    }, MATCH_DURATION_MS);
+
+    this.setMatchTimer(timer);
   }
 
   async generateAiChallengesForMatch() {
@@ -625,6 +651,7 @@ export class GameRoom {
       this.state = "ended";
       this.statusText = `${this.winner} win`;
       this.clearMeetingTimer();
+      this.clearMatchTimer();
       this.meeting = null;
       this.activeSabotage = null;
     }
@@ -652,12 +679,31 @@ export class GameRoom {
     this.meetingTimer = null;
   }
 
+  setMatchTimer(timer) {
+    this.clearMatchTimer();
+    this.matchTimer = timer;
+    this.schedule(timer);
+  }
+
+  clearMatchTimer() {
+    if (!this.matchTimer) {
+      return;
+    }
+
+    clearTimeout(this.matchTimer);
+    this.scheduledActions.delete(this.matchTimer);
+    this.matchTimer = null;
+    this.matchDeadline = null;
+  }
+
   clearSchedules() {
     for (const timer of this.scheduledActions) {
       clearTimeout(timer);
     }
     this.scheduledActions.clear();
     this.meetingTimer = null;
+    this.matchTimer = null;
+    this.matchDeadline = null;
   }
 
   get completedTaskCount() {
@@ -692,6 +738,7 @@ export class GameRoom {
       taskProgress: this.tasks.length ? this.completedTaskCount / this.tasks.length : 0,
       activeSabotage: this.activeSabotage?.serialize() ?? null,
       blackoutCooldownUntil: this.blackoutCooldownUntil,
+      matchDeadline: this.matchDeadline,
       disruption: this.disruption,
       meeting: this.meeting?.serialize() ?? null,
       viewerRole: viewer?.role ?? null,
