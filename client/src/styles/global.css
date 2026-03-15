@@ -16,6 +16,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
@@ -62,8 +63,9 @@ select {
 }
 
 .app-shell {
-  min-height: 100vh;
-  padding: 24px;
+  height: 100vh;
+  padding: 14px;
+  overflow: hidden;
 }
 
 .shell {
@@ -76,7 +78,8 @@ select {
 .shell--lobby {
   max-width: 1180px;
   margin: 0 auto;
-  padding-top: 3vh;
+  padding-top: 2vh;
+  max-height: calc(100vh - 28px);
 }
 
 .hero-card,
@@ -158,11 +161,13 @@ select {
 }
 
 .game-layout {
-  max-width: 1320px;
+  max-width: 1380px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  height: calc(100vh - 28px);
+  align-items: stretch;
 }
 
 .map-shell {
@@ -172,8 +177,11 @@ select {
     linear-gradient(180deg, rgba(11, 34, 58, 0.92), rgba(4, 15, 29, 0.97));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 28px;
-  padding: 20px;
-  overflow: auto;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .map-topbar {
@@ -181,7 +189,8 @@ select {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+  flex: 0 0 auto;
 }
 
 .map-topbar h2 {
@@ -229,6 +238,11 @@ select {
     #08192a;
   border-radius: 24px;
   overflow: hidden;
+  width: min(100%, var(--map-width));
+  max-width: var(--map-width);
+  aspect-ratio: calc(var(--map-width) / var(--map-height));
+  height: auto;
+  flex: 1 1 auto;
 }
 
 .map-corridor {
@@ -338,7 +352,12 @@ select {
 
 .sidebar {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+  min-height: 0;
+}
+
+.sidebar .panel {
+  padding: 18px;
 }
 
 .panel--hero {
@@ -403,10 +422,13 @@ select {
 
 .modal {
   width: min(720px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
 }
 
 .modal--code {
   width: min(1120px, 100%);
+  overflow: hidden;
 }
 
 .role-reveal {
@@ -442,18 +464,20 @@ select {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   gap: 18px;
-  margin: 18px 0;
+  margin: 14px 0;
+  min-height: 0;
 }
 
 .task-panel {
+  position: relative;
   padding: 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.05);
-  min-height: 420px;
+  min-height: 0;
 }
 
 .task-panel--blackout {
-  filter: brightness(0.34);
+  overflow: hidden;
 }
 
 .task-panel-header {
@@ -475,8 +499,9 @@ select {
 
 .code-editor {
   width: 100%;
-  min-height: 360px;
-  resize: vertical;
+  min-height: min(42vh, 360px);
+  height: min(42vh, 360px);
+  resize: none;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(2, 10, 20, 0.9);
@@ -490,6 +515,8 @@ select {
 .results-list {
   display: grid;
   gap: 10px;
+  max-height: 32vh;
+  overflow: auto;
 }
 
 .result-row {
@@ -538,6 +565,25 @@ select {
   background: rgba(255, 209, 102, 0.16);
 }
 
+.blackout-mask {
+  position: absolute;
+  inset: 52px 14px 14px 14px;
+  border-radius: 16px;
+  background: #000;
+  color: #f5fbff;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  z-index: 2;
+}
+
+.blackout-mask strong {
+  display: block;
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 980px) {
   .shell,
   .game-layout {
@@ -546,6 +592,19 @@ select {
 
   .task-layout {
     grid-template-columns: 1fr;
+  }
+
+  body,
+  .app-shell {
+    overflow: auto;
+  }
+
+  .game-layout {
+    height: auto;
+  }
+
+  .map-shell {
+    overflow: visible;
   }
 
   .lobby-form,
