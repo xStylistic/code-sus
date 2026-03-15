@@ -290,6 +290,7 @@ export default function App() {
         feedback={feedback}
         runResult={runResult}
         isBlackout={roomState?.activeSabotage?.type === "blackout"}
+        canBypassBlackout={roomState?.viewerRole === "Imposter"}
         isSpectator={roomState ? !roomState.players.find((player) => player.id === roomState.currentPlayerId)?.isAlive : false}
         currentPlayerId={roomState?.currentPlayerId}
       />

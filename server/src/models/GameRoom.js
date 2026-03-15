@@ -11,6 +11,7 @@ const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 3;
 const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
+const BLACKOUT_COOLDOWN_MS = 10000;
 
 export class GameRoom {
   constructor(roomId, hostSocketId, hostName, preferredLanguage = "javascript") {
@@ -26,6 +27,7 @@ export class GameRoom {
     this.taskProgress = 0;
     this.meeting = null;
     this.activeSabotage = null;
+    this.blackoutCooldownUntil = 0;
     this.corruptedTaskId = null;
     this.disruption = 0;
     this.winner = null;
@@ -133,6 +135,7 @@ export class GameRoom {
     this.disruption = 0;
     this.meeting = null;
     this.activeSabotage = null;
+    this.blackoutCooldownUntil = 0;
     this.corruptedTaskId = null;
     this.tasks = cloneTaskTemplates().map((taskTemplate) => new Task(taskTemplate));
     this.sharedTaskCode = {};
@@ -284,6 +287,10 @@ export class GameRoom {
       return { ok: false, error: "Sabotage unavailable." };
     }
 
+    if (type === "blackout" && Date.now() < this.blackoutCooldownUntil) {
+      return { ok: false, error: "Blackout is cooling down." };
+    }
+
     if (this.activeSabotage?.active) {
       return { ok: false, error: "A sabotage is already active." };
     }
@@ -291,10 +298,13 @@ export class GameRoom {
     const sabotage = new Sabotage({
       id: `${type}-${Date.now()}`,
       type,
-      duration: type === "blackout" ? 10000 : 20000
+      duration: type === "blackout" ? 20000 : 30000
     });
 
     this.activeSabotage = sabotage;
+    if (type === "blackout") {
+      this.blackoutCooldownUntil = Date.now() + BLACKOUT_COOLDOWN_MS;
+    }
     this.disruption += 1;
     this.statusText = type === "blackout" ? "Blackout active" : "Code corruption active";
 
@@ -546,6 +556,7 @@ export class GameRoom {
       })),
       taskProgress: this.tasks.length ? this.completedTaskCount / this.tasks.length : 0,
       activeSabotage: this.activeSabotage?.serialize() ?? null,
+      blackoutCooldownUntil: this.blackoutCooldownUntil,
       disruption: this.disruption,
       meeting: this.meeting?.serialize() ?? null,
       viewerRole: viewer?.role ?? null,

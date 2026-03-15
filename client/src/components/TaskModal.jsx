@@ -1,21 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-const CURSOR_COLORS = ["#80ffdb", "#ffd166", "#ff8fab", "#9bd5ff", "#cdb4db", "#ffafcc"];
-
-export function TaskModal({
-  task,
-  code,
-  onCodeChange,
-  onCursorChange,
-  onClose,
-  onRun,
-  onSubmit,
-  feedback,
-  runResult,
-  isBlackout,
-  isSpectator,
-  currentPlayerId
-}) {
+export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator }) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
   const [remoteMarkers, setRemoteMarkers] = useState([]);
@@ -119,38 +104,21 @@ export function TaskModal({
                 Editing now: {task.activeEditors.join(", ")}
               </div>
             ) : null}
-            <div className="code-editor-wrap">
-              <textarea
-                ref={editorRef}
-                className="code-editor"
-                spellCheck="false"
-                value={code}
-                onChange={(event) => {
-                  updateSelectionState(event.target);
-                  onCodeChange(event.target.value);
-                }}
-                onSelect={(event) => {
-                  updateSelectionState(event.target);
-                }}
-                onKeyUp={(event) => updateSelectionState(event.target)}
-                onClick={(event) => updateSelectionState(event.target)}
-                disabled={isSpectator}
-              />
-              <div className="cursor-layer" aria-hidden="true">
-                {remoteMarkers.map((marker) => (
-                  <div
-                    className="remote-cursor"
-                    key={marker.playerId}
-                    style={{ top: `${marker.top}px`, left: `${marker.left}px`, background: marker.color }}
-                  >
-                    <span className="remote-cursor-name" style={{ background: marker.color }}>
-                      {marker.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {isBlackout ? (
+            <textarea
+              ref={editorRef}
+              className="code-editor"
+              spellCheck="false"
+              value={code}
+              onChange={(event) => onCodeChange(event.target.value)}
+              onSelect={(event) => {
+                selectionRef.current = {
+                  start: event.target.selectionStart,
+                  end: event.target.selectionEnd
+                };
+              }}
+              disabled={isSpectator}
+            />
+            {isBlackout && !canBypassBlackout ? (
               <div className="blackout-mask">
                 <strong>Blackout</strong>
                 <span>Your workspace is offline.</span>
