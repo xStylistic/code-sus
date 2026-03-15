@@ -8,6 +8,14 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
     return (task?.cursors ?? []).filter((cursor) => cursor.playerId !== currentPlayerId);
   }, [task?.cursors, currentPlayerId]);
 
+  function updateSelectionState(target) {
+    selectionRef.current = {
+      start: target.selectionStart,
+      end: target.selectionEnd
+    };
+    onCursorChange?.(target.selectionStart, target.selectionEnd);
+  }
+
   useEffect(() => {
     selectionRef.current = { start: null, end: null };
     setRemoteMarkers([]);
