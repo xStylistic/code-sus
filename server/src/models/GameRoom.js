@@ -13,8 +13,8 @@ const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 3;
 const MAP_BOUNDS = { width: 640, height: 420 };
 const INTERACTION_RADIUS = 90;
-const BLACKOUT_COOLDOWN_MS = 10000;
-const MATCH_DURATION_MS = 1 * 60 * 1000;
+const BLACKOUT_COOLDOWN_MS = 5000;
+const MATCH_DURATION_MS = 3 * 60 * 1000;
 const OPTIMAL_SIMILARITY_THRESHOLD = 0.9;
 const AI_VERIFY_RETRY_BASE_MS = 1500;
 const AI_VERIFY_RETRY_MAX_MS = 12000;
@@ -456,7 +456,7 @@ export class GameRoom {
     const sabotage = new Sabotage({
       id: `${type}-${Date.now()}`,
       type,
-      duration: type === "blackout" ? 20000 : 30000
+      duration: type === "blackout" ? 5000 : 30000
     });
 
     this.activeSabotage = sabotage;

@@ -21,6 +21,10 @@ export function GameBoard({
   const me = roomState.players.find((player) => player.id === roomState.currentPlayerId);
   const blackoutCooldownMs = Math.max(0, (roomState.blackoutCooldownUntil ?? 0) - now);
   const blackoutCooldownSeconds = Math.ceil(blackoutCooldownMs / 1000);
+  const blackoutActiveMs = roomState.activeSabotage?.type === "blackout"
+    ? Math.max(0, (roomState.activeSabotage.startedAt + roomState.activeSabotage.duration) - now)
+    : 0;
+  const blackoutActiveSeconds = Math.ceil(blackoutActiveMs / 1000);
   const matchRemainingMs = Math.max(0, (roomState.matchDeadline ?? 0) - now);
   const matchRemainingSeconds = Math.ceil(matchRemainingMs / 1000);
   const nearbyStation = useMemo(() => {
@@ -226,7 +230,11 @@ export function GameBoard({
                   disabled={Boolean(roomState.activeSabotage) || blackoutCooldownMs > 0}
                   onClick={() => onTriggerSabotage("blackout")}
                 >
-                  {blackoutCooldownMs > 0 ? `Blackout ${blackoutCooldownSeconds}s` : "Trigger Blackout"}
+                  {blackoutActiveMs > 0
+                    ? `Blackout ${blackoutActiveSeconds}s`
+                    : blackoutCooldownMs > 0
+                      ? `Blackout ${blackoutCooldownSeconds}s`
+                      : "Trigger Blackout"}
                 </button>
                 <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
                   Corrupt Task

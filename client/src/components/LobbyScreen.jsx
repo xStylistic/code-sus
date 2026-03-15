@@ -82,6 +82,7 @@ export function LobbyScreen({
               <ul className="role-list">
                 <li>Explore the ship to find Task Nodes.</li>
                 <li>Write OOP code to solve tasks (AI verifies your work).</li>
+                <li>With 3+ Codemates: vote wrong, and the majority-voted player gets kicked out.</li>
                 <li>Finish all tasks before the ship is sabotaged!</li>
               </ul>
             </div>
