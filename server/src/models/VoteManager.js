@@ -4,6 +4,11 @@ export class VoteManager {
     this.votes = new Map();
   }
 
+  removeVoter(voterId) {
+    this.eligibleVoters.delete(voterId);
+    this.votes.delete(voterId);
+  }
+
   submitVote(voterId, targetId) {
     if (!this.eligibleVoters.has(voterId) || this.votes.has(voterId)) {
       return false;

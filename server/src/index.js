@@ -98,6 +98,18 @@ io.on("connection", (socket) => {
     io.to(room.roomId).emit("task_code_updated", payload);
   });
 
+  socket.on("update_task_cursor", ({ taskId, selectionStart, selectionEnd }, callback = () => {}) => {
+    const room = getCurrentRoom(socket.id);
+    const result = room?.updateTaskCursor(socket.id, taskId, selectionStart, selectionEnd);
+    if (!room || !result?.ok) {
+      callback(result ?? { ok: false, error: "Room not found." });
+      return;
+    }
+
+    io.to(room.roomId).emit("task_cursor_updated", result.payload);
+    callback({ ok: true });
+  });
+
   socket.on("start_game", (_payload, callback = () => {}) => {
     const room = getCurrentRoom(socket.id);
     const canStart = room?.canStart(socket.id);
@@ -187,7 +199,7 @@ io.on("connection", (socket) => {
       room.finalizeMeeting();
       syncRoom(room.roomId);
     }, 30000);
-    room.schedule(timer);
+    room.setMeetingTimer(timer);
 
     callback({ ok: true });
     syncRoom(room.roomId);

@@ -45,16 +45,31 @@ export default function App() {
         return {
           ...current,
           currentCode: payload.code,
-          activeEditors: payload.activeEditors
+          activeEditors: payload.activeEditors,
+          cursors: payload.cursors ?? current.cursors ?? []
+        };
+      });
+    };
+    const handleTaskCursorUpdated = (payload) => {
+      setTask((current) => {
+        if (!current || current.id !== payload.taskId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          cursors: payload.cursors ?? []
         };
       });
     };
     socket.on("sync_game_state", handleSync);
     socket.on("task_code_updated", handleTaskCodeUpdated);
+    socket.on("task_cursor_updated", handleTaskCursorUpdated);
 
     return () => {
       socket.off("sync_game_state", handleSync);
       socket.off("task_code_updated", handleTaskCodeUpdated);
+      socket.off("task_cursor_updated", handleTaskCursorUpdated);
     };
   }, []);
 
@@ -163,6 +178,18 @@ export default function App() {
     socket.emit("update_task_code", { taskId: task.id, code: nextCode });
   }
 
+  function handleTaskCursorChange(selectionStart, selectionEnd) {
+    if (!task) {
+      return;
+    }
+
+    socket.emit("update_task_cursor", {
+      taskId: task.id,
+      selectionStart,
+      selectionEnd
+    });
+  }
+
   async function runTask(taskId, response) {
     const result = await emitWithAck("run_task_code", { taskId, response });
     if (!result.ok) {
@@ -256,6 +283,7 @@ export default function App() {
         task={task}
         code={taskCode}
         onCodeChange={handleTaskCodeChange}
+        onCursorChange={handleTaskCursorChange}
         onClose={resetOverlay}
         onRun={runTask}
         onSubmit={submitTask}
@@ -263,6 +291,7 @@ export default function App() {
         runResult={runResult}
         isBlackout={roomState?.activeSabotage?.type === "blackout"}
         isSpectator={roomState ? !roomState.players.find((player) => player.id === roomState.currentPlayerId)?.isAlive : false}
+        currentPlayerId={roomState?.currentPlayerId}
       />
       <RoleRevealModal role={roleReveal} onClose={() => setRoleReveal(null)} />
       <MeetingModal roomState={roomState} onVote={submitVote} />
