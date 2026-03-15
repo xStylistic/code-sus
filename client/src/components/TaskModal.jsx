@@ -159,6 +159,14 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
         </div>
 
         <div className="button-row">
+          <button
+            className="button-secondary"
+            disabled={isSpectator}
+            onClick={() => onCodeChange(task.starterCode)}
+            title="Reset code back to the original starter template"
+          >
+            Reset
+          </button>
           <button className="button-secondary" disabled={isSpectator} onClick={() => onRun(task.id, { code })}>
             Run Code
           </button>

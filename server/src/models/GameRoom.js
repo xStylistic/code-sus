@@ -3,7 +3,8 @@ import { Role } from "./Role.js";
 import { Task } from "./Task.js";
 import { Sabotage } from "./Sabotage.js";
 import { MeetingManager } from "./MeetingManager.js";
-import { cloneTaskTemplates, TASK_STATIONS } from "../data/taskTemplates.js";
+import { cloneTaskTemplates } from "../data/taskTemplates.js";
+import { pickRandomLayout } from "../data/mapLayouts.js";
 import { evaluateTaskCode } from "../game/taskRunner.js";
 import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from "../data/languages.js";
 
@@ -36,6 +37,8 @@ export class GameRoom {
     this.meetingTimer = null;
 
     this.addPlayer(hostSocketId, hostName, true, preferredLanguage);
+    // mapLayout is chosen fresh at startGame() each match
+    this.mapLayout = null;
   }
 
   addPlayer(socketId, name, isHost = false, preferredLanguage = "javascript") {
@@ -142,9 +145,12 @@ export class GameRoom {
     this.taskEditors = {};
     this.taskCursors = {};
 
+    // Pick a fresh random map layout for this match
+    this.mapLayout = pickRandomLayout();
+
     const playerList = [...this.players.values()];
     playerList.forEach((player) => {
-      player.resetForMatch();
+      player.resetForMatch(this.mapLayout.spawnX, this.mapLayout.spawnY);
       player.role = Role.CODEMATE;
       player.setPreferredLanguage(this.selectedLanguage);
     });
@@ -165,8 +171,19 @@ export class GameRoom {
       return false;
     }
 
-    player.x = clamp(player.x + dx, 24, MAP_BOUNDS.width - 24);
-    player.y = clamp(player.y + dy, 24, MAP_BOUNDS.height - 24);
+    const nextX = clamp(player.x + dx, 24, MAP_BOUNDS.width  - 24);
+    const nextY = clamp(player.y + dy, 24, MAP_BOUNDS.height - 24);
+    const zones = this.mapLayout?.walkable ?? [];
+
+    if (isWalkable(nextX, nextY, zones)) {
+      player.x = nextX;
+      player.y = nextY;
+    } else if (isWalkable(nextX, player.y, zones)) {
+      player.x = nextX;
+    } else if (isWalkable(player.x, nextY, zones)) {
+      player.y = nextY;
+    }
+
     return true;
   }
 
@@ -176,7 +193,8 @@ export class GameRoom {
       return { ok: false, error: "Task interaction is unavailable right now." };
     }
 
-    const station = TASK_STATIONS.find((entry) => entry.id === stationId);
+    // Use current layout's station positions
+    const station = this.mapLayout?.stations.find((s) => s.id === stationId);
     if (!station) {
       return { ok: false, error: "Unknown task station." };
     }
@@ -568,7 +586,9 @@ export class GameRoom {
       map: {
         width: MAP_BOUNDS.width,
         height: MAP_BOUNDS.height,
-        stations: TASK_STATIONS
+        rooms: this.mapLayout?.rooms ?? [],
+        corridor: this.mapLayout?.corridor ?? null,
+        stations: this.mapLayout?.stations ?? []
       }
     };
   }
@@ -583,4 +603,23 @@ GameRoom.prototype.getStarterCode = function getStarterCode(task) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+// Walkable zones: must match MAP_WALKABLE in client/src/data/mapData.js
+// Corridors connect at exact room edges — no pixel overlap between zones.
+const WALKABLE_ZONES = [
+  // Rooms
+  { x: 20,  y: 15,  w: 175, h: 155 }, // Inheritance Bay
+  { x: 445, y: 15,  w: 175, h: 155 }, // Polymorphism Lab
+  { x: 235, y: 265, w: 170, h: 145 }, // Encapsulation Vault
+  // Corridors
+  { x: 82,  y: 170, w: 50,  h: 50  }, // Left vertical (Inheritance Bay → center)
+  { x: 507, y: 170, w: 50,  h: 50  }, // Right vertical (Polymorphism Lab → center)
+  { x: 82,  y: 220, w: 475, h: 45  }, // Center horizontal
+];
+
+function isWalkable(x, y) {
+  return WALKABLE_ZONES.some(
+    (zone) => x >= zone.x && x <= zone.x + zone.w && y >= zone.y && y <= zone.y + zone.h
+  );
 }
