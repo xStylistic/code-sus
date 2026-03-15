@@ -15,11 +15,12 @@ export class Player {
     this.completedTasks = [];
   }
 
-  resetForMatch() {
+  resetForMatch(spawnX = 320, spawnY = 190) {
     this.isAlive = true;
     this.completedTasks = [];
-    this.x = 80 + Math.round(Math.random() * 80);
-    this.y = 80 + Math.round(Math.random() * 80);
+    // Spread players slightly around the spawn point
+    this.x = spawnX + Math.round((Math.random() - 0.5) * 40);
+    this.y = spawnY + Math.round((Math.random() - 0.5) * 20);
   }
 
   setPreferredLanguage(language) {

@@ -2,24 +2,27 @@ export const TASK_STATIONS = [
   {
     id: "inheritance-bay",
     label: "Inheritance Bay",
-    x: 150,
-    y: 88,
+    // Inside room (x:20,y:15,w:175,h:155), near the bottom — center-x=107, bottom edge=170
+    x: 107,
+    y: 152,
     room: "Inheritance Bay",
     systemPart: "Base class hull"
   },
   {
     id: "polymorphism-lab",
     label: "Polymorphism Lab",
-    x: 520,
-    y: 116,
+    // Inside room (x:445,y:15,w:175,h:155), near the bottom — center-x=532
+    x: 532,
+    y: 152,
     room: "Polymorphism Lab",
     systemPart: "Dispatch engine"
   },
   {
     id: "encapsulation-vault",
     label: "Encapsulation Vault",
-    x: 336,
-    y: 330,
+    // Inside room (x:235,y:265,w:170,h:145), near the bottom — center-x=320, bottom edge=410
+    x: 320,
+    y: 385,
     room: "Encapsulation Vault",
     systemPart: "State security core"
   }
