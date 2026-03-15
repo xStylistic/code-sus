@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator }) {
+const CURSOR_COLORS = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#ff6348", "#ff7f50", "#7bed9f", "#eccc68"];
+
+export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator, currentPlayerId }) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
   const [remoteMarkers, setRemoteMarkers] = useState([]);
@@ -104,20 +106,30 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
                 Editing now: {task.activeEditors.join(", ")}
               </div>
             ) : null}
-            <textarea
-              ref={editorRef}
+            <div className="code-editor-wrap">
+              <textarea
+                ref={editorRef}
               className="code-editor"
               spellCheck="false"
               value={code}
               onChange={(event) => onCodeChange(event.target.value)}
-              onSelect={(event) => {
-                selectionRef.current = {
-                  start: event.target.selectionStart,
-                  end: event.target.selectionEnd
-                };
-              }}
+              onSelect={(event) => updateSelectionState(event.target)}
               disabled={isSpectator}
             />
+            <div className="cursor-layer">
+              {remoteMarkers.map((marker) => (
+                <div
+                  key={marker.playerId || marker.name}
+                  className="remote-cursor"
+                  style={{ top: marker.top, left: marker.left, backgroundColor: marker.color }}
+                >
+                  <span className="remote-cursor-name" style={{ backgroundColor: marker.color }}>
+                    {marker.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
             {isBlackout && !canBypassBlackout ? (
               <div className="blackout-mask">
                 <strong>Blackout</strong>

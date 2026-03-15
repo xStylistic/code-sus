@@ -1,4 +1,4 @@
-import { MAP_ROOMS, MAP_WALKABLE } from "../data/mapData.js";
+// No static map exports used anymore
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const MOVE_STEP = 8;
@@ -32,14 +32,6 @@ export function GameBoard({
   const isImposter = roomState.viewerRole === "Imposter";
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNow(Date.now());
-    }, 250);
-
-    return () => window.clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
     const onKeyDown = (event) => {
       // Don't steal keys from form inputs
       const tag = document.activeElement?.tagName;
@@ -51,7 +43,7 @@ export function GameBoard({
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const interval = window.setInterval(() => {
+    const moveInterval = window.setInterval(() => {
       if (!me?.isAlive || roomState.meeting) return;
 
       let dx = 0;
@@ -62,13 +54,20 @@ export function GameBoard({
       if (keysRef.current.has("a") || keysRef.current.has("arrowleft")) dx -= MOVE_STEP;
       if (keysRef.current.has("d") || keysRef.current.has("arrowright")) dx += MOVE_STEP;
 
-      if (dx !== 0 || dy !== 0) onMove(dx, dy);
+      if (dx !== 0 || dy !== 0) {
+        onMove(dx, dy);
+      }
     }, 80);
+
+    const timeInterval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      window.clearInterval(interval);
+      window.clearInterval(moveInterval);
+      window.clearInterval(timeInterval);
     };
   }, [me?.isAlive, onMove, roomState.meeting]);
 
@@ -96,24 +95,29 @@ export function GameBoard({
           }}
         >
           {/* ── Walkable corridors (visual) ──────────────────────── */}
-          {MAP_WALKABLE.map((zone, i) => (
+          {roomState.map.corridors?.map((corridor, i) => (
             <div
-              key={i}
+              key={`corridor-${i}`}
               className="map-corridor"
-              style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}
+              style={{
+                left: corridor.x,
+                top: corridor.y,
+                width: corridor.w,
+                height: corridor.h
+              }}
             />
           ))}
 
           {/* ── Rooms ────────────────────────────────────────────── */}
-          {MAP_ROOMS.map((room) => (
+          {roomState.map.rooms.map((room) => (
             <div
               key={room.id}
               className="map-room"
               style={{
                 left: room.x,
                 top: room.y,
-                width: room.width,
-                height: room.height,
+                width: room.w || room.width, // fallback to handle 'w' or 'width'
+                height: room.h || room.height,
                 "--room-accent": room.color,
                 "--room-glow": room.glow
               }}
@@ -204,60 +208,27 @@ export function GameBoard({
         <div className="panel">
           <p className="eyebrow">Actions</p>
           <div className="action-list">
-            <button
-              disabled={!nearbyStation || !me?.isAlive}
-              onClick={() => onOpenTask(nearbyStation?.id)}
-            >
+            <button disabled={!nearbyStation || !me?.isAlive} onClick={() => onOpenTask(nearbyStation?.id)}>
               {nearbyStation ? `Use ${nearbyStation.label}` : "Move near a task station"}
             </button>
-
-            <button
-              className="button-secondary"
-              disabled={!me?.isAlive || Boolean(roomState.meeting)}
-              onClick={onCallMeeting}
-            >
+            <button className="button-secondary" disabled={!me?.isAlive || roomState.meeting} onClick={onCallMeeting}>
               Call Meeting
             </button>
-
-            {isImposter && (
+            {roomState.viewerRole === "Imposter" ? (
               <>
                 <button
                   className="button-danger"
-                  disabled={Boolean(roomState.activeSabotage)}
+                  disabled={Boolean(roomState.activeSabotage) || blackoutCooldownMs > 0}
                   onClick={() => onTriggerSabotage("blackout")}
                 >
-                  Trigger Blackout
+                  {blackoutCooldownMs > 0 ? `Blackout ${blackoutCooldownSeconds}s` : "Trigger Blackout"}
                 </button>
-                <button
-                  className="button-danger"
-                  disabled={Boolean(roomState.activeSabotage)}
-                  onClick={() => onTriggerSabotage("code_corruption")}
-                >
+                <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
                   Corrupt Task
                 </button>
               </>
-            )}
+            ) : null}
           </div>
-          <button disabled={!nearbyStation || !me?.isAlive} onClick={() => onOpenTask(nearbyStation?.id)}>
-            {nearbyStation ? `Use ${nearbyStation.label}` : "Move near a task station"}
-          </button>
-          <button className="button-secondary" disabled={!me?.isAlive || roomState.meeting} onClick={onCallMeeting}>
-            Call Meeting
-          </button>
-          {roomState.viewerRole === "Imposter" ? (
-            <>
-              <button
-                className="button-danger"
-                disabled={Boolean(roomState.activeSabotage) || blackoutCooldownMs > 0}
-                onClick={() => onTriggerSabotage("blackout")}
-              >
-                {blackoutCooldownMs > 0 ? `Blackout ${blackoutCooldownSeconds}s` : "Trigger Blackout"}
-              </button>
-              <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
-                Corrupt Task
-              </button>
-            </>
-          ) : null}
         </div>
 
         {/* Players */}

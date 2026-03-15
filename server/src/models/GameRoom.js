@@ -147,6 +147,7 @@ export class GameRoom {
 
     // Pick a fresh random map layout for this match
     this.mapLayout = pickRandomLayout();
+    console.log(`[GameRoom] Room ${this.roomId} started with layout ${this.mapLayout.id}`);
 
     const playerList = [...this.players.values()];
     playerList.forEach((player) => {
@@ -168,6 +169,7 @@ export class GameRoom {
   updatePlayerPosition(socketId, dx, dy) {
     const player = this.players.get(socketId);
     if (!player || !player.isAlive || this.state !== "in_game" || this.meeting) {
+      console.log(`[Move Rejected] ID: ${socketId}, Player: ${!!player}, Alive: ${player?.isAlive}, State: ${this.state}, Meeting: ${!!this.meeting}`);
       return false;
     }
 
@@ -175,13 +177,19 @@ export class GameRoom {
     const nextY = clamp(player.y + dy, 24, MAP_BOUNDS.height - 24);
     const zones = this.mapLayout?.walkable ?? [];
 
-    if (isWalkable(nextX, nextY, zones)) {
+    const isWXY = isWalkable(nextX, nextY, zones);
+    const isWXYOrig = isWalkable(nextX, player.y, zones);
+    const isWOrigY = isWalkable(player.x, nextY, zones);
+
+    if (isWXY) {
       player.x = nextX;
       player.y = nextY;
-    } else if (isWalkable(nextX, player.y, zones)) {
+    } else if (isWXYOrig) {
       player.x = nextX;
-    } else if (isWalkable(player.x, nextY, zones)) {
+    } else if (isWOrigY) {
       player.y = nextY;
+    } else {
+      console.log(`[Move Blocked by Walls] Pos: ${player.x},${player.y} -> Next: ${nextX},${nextY}. Zones: ${zones.length}`);
     }
 
     return true;
@@ -584,10 +592,11 @@ export class GameRoom {
         label: LANGUAGE_LABELS[language]
       })),
       map: {
+        id: this.mapLayout?.id ?? "",
         width: MAP_BOUNDS.width,
         height: MAP_BOUNDS.height,
         rooms: this.mapLayout?.rooms ?? [],
-        corridor: this.mapLayout?.corridor ?? null,
+        corridors: this.mapLayout?.corridors ?? [],
         stations: this.mapLayout?.stations ?? []
       }
     };
@@ -618,8 +627,8 @@ const WALKABLE_ZONES = [
   { x: 82,  y: 220, w: 475, h: 45  }, // Center horizontal
 ];
 
-function isWalkable(x, y) {
-  return WALKABLE_ZONES.some(
+function isWalkable(x, y, zones = WALKABLE_ZONES) {
+  return zones.some(
     (zone) => x >= zone.x && x <= zone.x + zone.w && y >= zone.y && y <= zone.y + zone.h
   );
 }

@@ -780,14 +780,459 @@ int get_balance(BankAccount* account) {
     return account->balance;
 }
 `
+    }   // Close c
+  }     // Close languages
+},      // Close task
+  {
+    id: "abstraction-core",
+    type: "abstraction",
+    title: "Abstract the Interface",
+    prompt:
+      "The hardware driver is coupled to a specific device. Create an abstract interface that any device can implement, and make the system use it.",
+    visibleChecks: [
+      "The system should accept any object implementing the interface",
+      "The abstract interface should define a read() and write() method",
+      "The concrete device should implement these methods"
+    ],
+    languages: {
+      javascript: {
+        starterCode: `class GenericDevice {
+  constructor(name) {
+    this.name = name;
+  }
+  
+  read() { return this.name + " reading"; }
+  write() { return this.name + " writing"; }
+}
+
+class System {
+  constructor(device) {
+    this.device = device;
+  }
+}
+`,
+        corruptedStarterCode: `class SpecificDevice {
+  constructor(name) {
+    this.name = name;
+  }
+  
+  read() { return this.name + " reading"; }
+  write() { return this.name + " writing"; }
+}
+
+class System {
+  constructor() {
+    this.device = new SpecificDevice("default");
+  }
+}
+`
+      },
+      python: {
+        starterCode: `class GenericDevice:
+    def __init__(self, name):
+        self.name = name
+        
+    def read(self):
+        return f"{self.name} reading"
+        
+    def write(self):
+        return f"{self.name} writing"
+
+class System:
+    def __init__(self, device):
+        self.device = device
+`,
+        corruptedStarterCode: `class SpecificDevice:
+    def __init__(self, name):
+        self.name = name
+        
+    def read(self):
+        return f"{self.name} reading"
+        
+    def write(self):
+        return f"{self.name} writing"
+
+class System:
+    def __init__(self):
+        self.device = SpecificDevice("default")
+`
+      },
+      java: {
+        starterCode: `interface Device {
+    String read();
+    String write();
+}
+
+class GenericDevice implements Device {
+    private String name;
+    GenericDevice(String name) { this.name = name; }
+    public String read() { return name + " reading"; }
+    public String write() { return name + " writing"; }
+}
+
+class System {
+    Device device;
+    System(Device device) { this.device = device; }
+}
+`,
+        corruptedStarterCode: `class SpecificDevice {
+    private String name;
+    SpecificDevice(String name) { this.name = name; }
+    public String read() { return name + " reading"; }
+    public String write() { return name + " writing"; }
+}
+
+class System {
+    SpecificDevice device;
+    System() { this.device = new SpecificDevice("default"); }
+}
+`
+      },
+      cpp: {
+        starterCode: `#include <string>
+using namespace std;
+
+class Device {
+public:
+    virtual string read() = 0;
+    virtual string write() = 0;
+};
+
+class GenericDevice : public Device {
+    string name;
+public:
+    GenericDevice(string name) : name(name) {}
+    string read() override { return name + " reading"; }
+    string write() override { return name + " writing"; }
+};
+
+class System {
+public:
+    Device* device;
+    System(Device* device) : device(device) {}
+};
+`,
+        corruptedStarterCode: `#include <string>
+using namespace std;
+
+class SpecificDevice {
+    string name;
+public:
+    SpecificDevice(string name) : name(name) {}
+    string read() { return name + " reading"; }
+    string write() { return name + " writing"; }
+};
+
+class System {
+public:
+    SpecificDevice* device;
+    System() { device = new SpecificDevice("default"); }
+};
+`
+      },
+      c: {
+        starterCode: `typedef struct {
+    const char* (*read)(void* self);
+    const char* (*write)(void* self);
+} DeviceInterface;
+
+typedef struct {
+    DeviceInterface vtable;
+    const char* name;
+} GenericDevice;
+
+typedef struct {
+    DeviceInterface* device;
+} System;
+`,
+        corruptedStarterCode: `typedef struct {
+    const char* name;
+} SpecificDevice;
+
+typedef struct {
+    SpecificDevice* device;
+} System;
+`
+      }
+    }
+  },
+  {
+    id: "composition-core",
+    type: "composition",
+    title: "Favor Component Composition",
+    prompt:
+      "A deep inheritance tree is causing brittle behavior. Refactor the Robot class to use composition, injecting an Engine and a Frame instead of inheriting from them.",
+    visibleChecks: [
+      "The Robot class should hold references to Engine and Frame components",
+      "Calling forward() should delegate to the internal Engine component",
+      "The Robot should be flexible to swap components at runtime"
+    ],
+    languages: {
+      javascript: {
+        starterCode: `class Engine { speed() { return 10; } }
+class Frame { weight() { return 50; } }
+
+class Robot {
+  constructor(engine, frame) {
+    this.engine = engine;
+    this.frame = frame;
+  }
+  
+  forward() {
+    return this.engine.speed();
+  }
+}
+`,
+        corruptedStarterCode: `class Machine { speed() { return 10; } weight() { return 50; } }
+
+class Robot extends Machine {
+  forward() {
+    return this.speed();
+  }
+}
+`
+      },
+      python: {
+        starterCode: `class Engine:
+    def speed(self): return 10
+class Frame:
+    def weight(self): return 50
+
+class Robot:
+    def __init__(self, engine, frame):
+        self.engine = engine
+        self.frame = frame
+        
+    def forward(self):
+        return self.engine.speed()
+`,
+        corruptedStarterCode: `class Machine:
+    def speed(self): return 10
+    def weight(self): return 50
+
+class Robot(Machine):
+    def forward(self):
+        return self.speed()
+`
+      },
+      java: {
+        starterCode: `class Engine { int speed() { return 10; } }
+class Frame { int weight() { return 50; } }
+
+class Robot {
+    Engine engine;
+    Frame frame;
+    
+    Robot(Engine engine, Frame frame) {
+        this.engine = engine;
+        this.frame = frame;
+    }
+    
+    int forward() {
+        return engine.speed();
+    }
+}
+`,
+        corruptedStarterCode: `class Machine { int speed() { return 10; } int weight() { return 50; } }
+
+class Robot extends Machine {
+    int forward() {
+        return speed();
+    }
+}
+`
+      },
+      cpp: {
+        starterCode: `class Engine { public: int speed() { return 10; } };
+class Frame { public: int weight() { return 50; } };
+
+class Robot {
+    Engine* engine;
+    Frame* frame;
+public:
+    Robot(Engine* e, Frame* f) : engine(e), frame(f) {}
+    
+    int forward() {
+        return engine->speed();
+    }
+};
+`,
+        corruptedStarterCode: `class Machine { public: int speed() { return 10; } int weight() { return 50; } };
+
+class Robot : public Machine {
+public:
+    int forward() {
+        return speed();
+    }
+};
+`
+      },
+      c: {
+        starterCode: `typedef struct { int (*speed)(); } Engine;
+typedef struct { int (*weight)(); } Frame;
+
+typedef struct {
+    Engine* engine;
+    Frame* frame;
+} Robot;
+
+int forward(Robot* r) { return r->engine->speed(); }
+`,
+        corruptedStarterCode: `typedef struct { int (*speed)(); int (*weight)(); } Machine;
+
+typedef struct {
+    Machine base;
+} Robot;
+
+int forward(Robot* r) { return r->base.speed(); }
+`
+      }
+    }
+  },
+  {
+    id: "solid-core",
+    type: "single_responsibility",
+    title: "Decouple Responsibilities",
+    prompt:
+      "The LogManager handles both formatting and network IO. Split this God Class into two distinct classes obeying the Single Responsibility Principle.",
+    visibleChecks: [
+      "There should be a Formatter class handling string output",
+      "There should be a NetworkTransport class handling delivery",
+      "The main application should coordinate both independently"
+    ],
+    languages: {
+      javascript: {
+        starterCode: `class Formatter {
+  format(msg) { return \`[LOG]: \${msg}\`; }
+}
+class Transport {
+  send(payload) { return true; }
+}
+
+class App {
+  constructor(formatter, transport) {
+    this.formatter = formatter;
+    this.transport = transport;
+  }
+}
+`,
+        corruptedStarterCode: `class LogManager {
+  format(msg) { return \`[LOG]: \${msg}\`; }
+  send(payload) { return true; }
+  
+  process(msg) {
+    const payload = this.format(msg);
+    this.send(payload);
+  }
+}
+`
+      },
+      python: {
+        starterCode: `class Formatter:
+    def format(self, msg): return f"[LOG]: {msg}"
+    
+class Transport:
+    def send(self, payload): return True
+
+class App:
+    def __init__(self, formatter, transport):
+        self.formatter = formatter
+        self.transport = transport
+`,
+        corruptedStarterCode: `class LogManager:
+    def format(self, msg): return f"[LOG]: {msg}"
+    def send(self, payload): return True
+    
+    def process(self, msg):
+        payload = self.format(msg)
+        self.send(payload)
+`
+      },
+      java: {
+        starterCode: `class Formatter { String format(String msg) { return "[LOG]: " + msg; } }
+class Transport { boolean send(String payload) { return true; } }
+
+class App {
+    Formatter formatter;
+    Transport transport;
+    App(Formatter f, Transport t) {
+        this.formatter = f;
+        this.transport = t;
+    }
+}
+`,
+        corruptedStarterCode: `class LogManager {
+    String format(String msg) { return "[LOG]: " + msg; }
+    boolean send(String payload) { return true; }
+    
+    void process(String msg) {
+        String payload = format(msg);
+        send(payload);
+    }
+}
+`
+      },
+      cpp: {
+        starterCode: `#include <string>
+using namespace std;
+
+class Formatter { public: string format(string msg) { return "[LOG]: " + msg; } };
+class Transport { public: bool send(string payload) { return true; } };
+
+class App {
+    Formatter* formatter;
+    Transport* transport;
+public:
+    App(Formatter* f, Transport* t) : formatter(f), transport(t) {}
+};
+`,
+        corruptedStarterCode: `#include <string>
+using namespace std;
+
+class LogManager {
+public:
+    string format(string msg) { return "[LOG]: " + msg; }
+    bool send(string payload) { return true; }
+    
+    void process(string msg) {
+        string payload = format(msg);
+        send(payload);
+    }
+};
+`
+      },
+      c: {
+        starterCode: `typedef struct {} Formatter;
+typedef struct {} Transport;
+
+typedef struct {
+    Formatter* formatter;
+    Transport* transport;
+} App;
+`,
+        corruptedStarterCode: `typedef struct {} LogManager;
+
+char* format(LogManager* lm, const char* msg) { return "[LOG]"; }
+int send(LogManager* lm, const char* payload) { return 1; }
+`
       }
     }
   }
 ];
 
 export function cloneTaskTemplates() {
-  return TASK_TEMPLATES.map((task) => ({
+  // Shuffle all available templates
+  const shuffled = [...TASK_TEMPLATES].sort(() => 0.5 - Math.random());
+  
+  // Pick exactly 3 to play with in this match
+  const selected = shuffled.slice(0, 3);
+  
+  // Assign them to the 3 map stations so they spawn correctly in the rooms
+  const stationIds = ["inheritance-bay", "polymorphism-lab", "encapsulation-vault"];
+  
+  return selected.map((task, index) => ({
     ...task,
+    stationId: stationIds[index],
     status: "pending",
     completedBy: null,
     corrupted: false
