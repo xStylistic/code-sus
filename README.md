@@ -1,6 +1,6 @@
 # Code Sus
 
-A multiplayer social deduction game where players solve OOP coding tasks on a shared ship while trying to find the hacker among them. Think Among Us, but with code.
+A multiplayer social deduction game where players solve coding tasks on a shared ship while trying to find the hacker among them. Like the popular 2020 game Among Us, but with code.
 
 3-8 players join a room, get assigned roles (Codemate or Hacker), and race to either complete all coding tasks or figure out who's been sabotaging the codebase.
 
@@ -12,14 +12,9 @@ A multiplayer social deduction game where players solve OOP coding tasks on a sh
 
 ```bash
 cd agent
-pip install -r requirements.txt
+pip/pip3 install -r requirements.txt
 ```
 
-Create a `.env` file in the `agent/` folder with your Gemini API key:
-
-```
-GEMINI_API_KEY=your_key_here
-```
 
 ### 2. Install Node dependencies
 
@@ -40,7 +35,7 @@ This starts all three services at once:
 - **Server** at `http://localhost:3001`
 - **Agent** at `http://localhost:5001`
 
-Open multiple browser tabs to simulate players. For LAN play, open `http://YOUR_LOCAL_IP:5173` on other devices connected to the same network.
+Open multiple browser tabs to simulate players. For multi player play, open `http://YOUR_LOCAL_IP:5173` on other devices connected to the same network.
 
 > The game works without the agent service running — AI features just won't be available.
 
@@ -55,7 +50,7 @@ Open multiple browser tabs to simulate players. For LAN play, open `http://YOUR_
 **Win conditions:**
 - Codemates win by completing all tasks
 - Codemates win by voting out the Hacker
-- Hacker wins if sabotage pressure hits 4 or they reach crew parity
+- Hacker wins if timer runs out before all tasks are completed
 
 ## AI Features (Powered by Gemini)
 
@@ -64,9 +59,9 @@ The agent service uses [Railtracks](https://railtownai.github.io/railtracks/) to
 - **Task Generator** — Creates unique OOP coding challenges each match with starter code, solutions, and validation checks
 - **Imposter Advisor** — Gives the Hacker AI-generated sabotage code that looks real but uses bad practices
 - **Code Verifier** — Automatically reviews submissions and gives feedback on correctness and code quality
-- **Meeting Analyst** — Analyzes player behavior during meetings and suggests discussion prompts
+- **Meeting Analyst** — Analyzes player behavior during meetings and suggests discussion prompts 
 
-After the match ends, players see an AI-generated code review summary with issues and fixes for each task they submitted, plus the optimal solutions revealed.
+After the match ends, players see an AI generated code review summary with issues and fixes for each task they submitted, plus the optimal solutions revealed.
 
 ## Tech Stack
 
@@ -74,12 +69,11 @@ After the match ends, players see an AI-generated code review summary with issue
 |-------|------|
 | Frontend | React, Vite |
 | Backend | Node.js, Express, Socket.IO |
-| AI Agent | Python, FastAPI, Railtracks, Gemini 2.0 Flash |
-| Task Execution | Node `vm` sandbox (JS), structural validation (Python/Java/C++/C) |
+| AI Agent | Python, FastAPI, Railtracks, Gemini 2.5 Flash |
 
 ## Local Network Play
 
 1. Start with `npm run dev:all`
 2. Find your machine's local IP (e.g. `192.168.1.25`)
 3. Other devices on the same Wi-Fi open `http://YOUR_LOCAL_IP:5173`
-4. The client auto-connects to the server on the same host — no extra config needed
+4. The client auto connects to the server on the same host and yall can start playing!
