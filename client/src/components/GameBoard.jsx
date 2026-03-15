@@ -21,6 +21,8 @@ export function GameBoard({
   const me = roomState.players.find((player) => player.id === roomState.currentPlayerId);
   const blackoutCooldownMs = Math.max(0, (roomState.blackoutCooldownUntil ?? 0) - now);
   const blackoutCooldownSeconds = Math.ceil(blackoutCooldownMs / 1000);
+  const matchRemainingMs = Math.max(0, (roomState.matchDeadline ?? 0) - now);
+  const matchRemainingSeconds = Math.ceil(matchRemainingMs / 1000);
   const nearbyStation = useMemo(() => {
     if (!me) return null;
     return roomState.map.stations.find(
@@ -195,6 +197,11 @@ export function GameBoard({
           <p style={{ marginTop: 6, fontSize: "0.82rem", color: "var(--text-secondary)" }}>
             Progress: {Math.round(roomState.taskProgress * 100)}% &nbsp;·&nbsp; Sabotage: {roomState.disruption}/4
           </p>
+          {roomState.state === "in_game" ? (
+            <p style={{ marginTop: 6, fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+              Time Left: {formatCountdown(matchRemainingSeconds)}
+            </p>
+          ) : null}
           {!me?.isAlive && (
             <p className="banner" style={{ marginTop: 10 }}>
               Spectator mode — you can watch but not act.
@@ -246,4 +253,11 @@ export function GameBoard({
       </aside>
     </div>
   );
+}
+
+function formatCountdown(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const minutesPart = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const secondsPart = (seconds % 60).toString().padStart(2, "0");
+  return `${minutesPart}:${secondsPart}`;
 }
