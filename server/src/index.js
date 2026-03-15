@@ -3,6 +3,7 @@ import http from "http";
 import cors from "cors";
 import { Server } from "socket.io";
 import { GameRoom } from "./models/GameRoom.js";
+import { getImposterHints, verifyCode, getMeetingInsights, isAgentAvailable } from "./services/agentBridge.js";
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -229,6 +230,87 @@ io.on("connection", (socket) => {
     }
 
     callback({ ok: true, state: room.serializeForPlayer(socket.id) });
+  });
+
+  // ── AI Agent Events ───────────────────────────────────────────────────────
+
+  socket.on("request_imposter_hints", async ({ taskId }, callback = () => {}) => {
+    const room = getCurrentRoom(socket.id);
+    const player = room?.getPlayer(socket.id);
+
+    if (!room || !player || player.role !== "Imposter") {
+      callback({ ok: false, error: "Hints unavailable." });
+      return;
+    }
+
+    const task = room.tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      callback({ ok: false, error: "Task not found." });
+      return;
+    }
+
+    const currentCode = room.sharedTaskCode[taskId] ?? "";
+    const result = await getImposterHints(
+      task.type,
+      room.selectedLanguage,
+      currentCode,
+      task.prompt
+    );
+
+    callback(result);
+  });
+
+  socket.on("request_ai_verify", async ({ taskId, code }, callback = () => {}) => {
+    const room = getCurrentRoom(socket.id);
+    const player = room?.getPlayer(socket.id);
+
+    if (!room || !player || !player.isAlive || room.state !== "in_game") {
+      callback({ ok: false, error: "Verification unavailable." });
+      return;
+    }
+
+    const task = room.tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      callback({ ok: false, error: "Task not found." });
+      return;
+    }
+
+    const result = await verifyCode(
+      task.type,
+      room.selectedLanguage,
+      code ?? room.sharedTaskCode[taskId] ?? "",
+      task.prompt
+    );
+
+    callback(result);
+  });
+
+  socket.on("request_meeting_insights", async (_payload, callback = () => {}) => {
+    const room = getCurrentRoom(socket.id);
+    if (!room || !room.meeting) {
+      callback({ ok: false, error: "No meeting active." });
+      return;
+    }
+
+    const players = [...room.players.values()].map((player) => ({
+      name: player.name,
+      isAlive: player.isAlive,
+      completedTasks: player.completedTasks
+    }));
+
+    const result = await getMeetingInsights(
+      players,
+      room.taskEditors,
+      room.disruption,
+      room.taskProgress
+    );
+
+    callback(result);
+  });
+
+  socket.on("check_agent_status", async (_payload, callback = () => {}) => {
+    const available = await isAgentAvailable();
+    callback({ ok: true, agentAvailable: available });
   });
 
   socket.on("disconnect", () => {

@@ -2,7 +2,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const CURSOR_COLORS = ["#ff4757", "#2ed573", "#1e90ff", "#ffa502", "#ff6348", "#ff7f50", "#7bed9f", "#eccc68"];
 
-export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator, currentPlayerId }) {
+export function TaskModal({
+  task, code, onCodeChange, onCursorChange, onCursorChange, onClose, onRun, onSubmit,
+  feedback, runResult, isBlackout, canBypassBlackout, isSpectator, currentPlayerId, currentPlayerId,
+  imposterHints, aiVerification, aiLoading
+}) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
   const [remoteMarkers, setRemoteMarkers] = useState([]);
@@ -113,10 +117,10 @@ export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, o
 
         <p>{task.prompt}</p>
         {task.corrupted ? <p className="banner banner--warning">Code Corruption is active. The starter code has been sabotaged and needs a real fix.</p> : null}
-        {task.fakeOnly ? <p className="banner">You are faking this task. You can type code, but it will not affect team progress.</p> : null}
+        {task.fakeOnly ? <p className="banner banner--imposter">You are faking this task. Use the AI Sabotage Intel below to look busy.</p> : null}
         {isSpectator ? <p className="banner">You were voted out. You can spectate the shared code but cannot edit or submit.</p> : null}
 
-        <div className="task-layout">
+        <div className={`task-layout ${task.fakeOnly && imposterHints ? "task-layout--three-col" : ""}`}>
           <section className={`task-panel ${isBlackout ? "task-panel--blackout" : ""}`}>
             <div className="task-panel-header">
               <span>{task.languageLabel}</span>
@@ -193,8 +197,73 @@ export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, o
               </div>
             ) : null}
 
+            {aiLoading && !aiVerification ? (
+              <div className="ai-verification">
+                <div className="task-panel-header">
+                  <span>AI Review</span>
+                  <span>Analyzing...</span>
+                </div>
+                <p className="banner">AI is reviewing your submission...</p>
+              </div>
+            ) : null}
+
+            {aiVerification ? (
+              <div className="ai-verification">
+                <div className="task-panel-header">
+                  <span>AI Review</span>
+                  <span>{aiVerification.is_correct ? "Approved" : "Needs Work"}</span>
+                </div>
+                <p className={`banner ${aiVerification.is_correct ? "" : "banner--danger"}`}>
+                  {aiVerification.explanation}
+                </p>
+                {aiVerification.issues.length > 0 ? (
+                  <div className="results-list">
+                    {aiVerification.issues.map((issue, i) => (
+                      <div className="result-row result-row--fail" key={i}>
+                        <strong>Issue</strong>
+                        <span>{issue}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {feedback ? <p className={`banner ${feedback.ok ? "" : "banner--danger"}`}>{feedback.message}</p> : null}
           </section>
+
+          {/* ── Imposter Hints Panel (AI-powered, only visible to imposter) ── */}
+          {task.fakeOnly && imposterHints ? (
+            <section className="task-panel task-panel--sabotage">
+              <div className="task-panel-header">
+                <span>AI Sabotage Intel</span>
+              </div>
+              {imposterHints.map((hint, index) => (
+                <div key={index} style={{ marginBottom: 8 }}>
+                  <pre className="hint-code">{hint.code_snippet}</pre>
+                  <p className="hint-bad-practice">{hint.bad_practice}</p>
+                  <button
+                    className="hint-card"
+                    onClick={() => onCodeChange(hint.code_snippet)}
+                  >
+                    Use this code
+                  </button>
+                </div>
+              ))}
+            </section>
+          ) : null}
+
+          {task.fakeOnly && !imposterHints && aiLoading ? (
+            <section className="task-panel task-panel--sabotage">
+              <div className="task-panel-header">
+                <span>AI Sabotage Intel</span>
+                <span>Loading...</span>
+              </div>
+              <p className="helper-text" style={{ fontSize: "0.82rem" }}>
+                AI is generating sabotage suggestions...
+              </p>
+            </section>
+          ) : null}
         </div>
 
         <div className="button-row">
@@ -253,3 +322,8 @@ function getCaretCoordinates(textarea, position) {
   document.body.removeChild(mirror);
   return { top, left };
 }
+
+const CURSOR_COLORS = [
+  "#ff6b6b", "#ffd93d", "#6bcb77", "#4d96ff",
+  "#ff922b", "#cc5de8", "#20c997", "#ff8787"
+];

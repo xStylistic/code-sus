@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export function MeetingModal({ roomState, onVote }) {
+export function MeetingModal({ roomState, onVote, meetingInsights, onRequestInsights, aiLoading }) {
   const meeting = roomState?.meeting;
   const me = roomState?.players.find((player) => player.id === roomState.currentPlayerId);
   const canVote = Boolean(me);
@@ -29,6 +29,37 @@ export function MeetingModal({ roomState, onVote }) {
         <p className="eyebrow">Emergency meeting</p>
         <h3>Who injected the bugs?</h3>
         <p>{secondsLeft}s left to discuss and vote.</p>
+
+        {/* ── AI Meeting Insights ── */}
+        {meetingInsights ? (
+          <div className="ai-insights">
+            <div className="task-panel-header" style={{ marginTop: 8 }}>
+              <span>AI Analysis</span>
+            </div>
+            {meetingInsights.suspicious_behaviors.map((obs, i) => (
+              <p key={i} className="banner banner--warning" style={{ marginBottom: 6, fontSize: "0.85rem" }}>
+                {obs}
+              </p>
+            ))}
+            {meetingInsights.discussion_prompts.map((prompt, i) => (
+              <p key={`q-${i}`} className="helper-text" style={{ fontSize: "0.85rem", marginBottom: 4 }}>
+                {prompt}
+              </p>
+            ))}
+            <p className="banner" style={{ fontSize: "0.85rem", marginTop: 6 }}>
+              {meetingInsights.tip}
+            </p>
+          </div>
+        ) : onRequestInsights ? (
+          <button
+            className="button-secondary button-ai"
+            disabled={aiLoading}
+            onClick={onRequestInsights}
+            style={{ marginBottom: 12, width: "100%" }}
+          >
+            {aiLoading ? "AI Analyzing..." : "Ask AI for Analysis"}
+          </button>
+        ) : null}
 
         <div className="vote-grid">
           {alivePlayers.map((player) => (
