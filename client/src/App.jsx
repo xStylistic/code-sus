@@ -24,12 +24,22 @@ export default function App() {
   const [feedback, setFeedback] = useState(null);
   const [runResult, setRunResult] = useState(null);
   const [roleReveal, setRoleReveal] = useState(null);
+  const [imposterHints, setImposterHints] = useState(null);
+  const [aiVerification, setAiVerification] = useState(null);
+  const [meetingInsights, setMeetingInsights] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiReviews, setAiReviews] = useState([]);
 
   useEffect(() => {
     const handleSync = (state) => {
       setRoomState((previous) => {
         if (previous?.state !== "in_game" && state.state === "in_game" && state.viewerRole) {
           setRoleReveal(state.viewerRole);
+        }
+
+        // Clear meeting insights when meeting ends
+        if (previous?.meeting && !state.meeting) {
+          setMeetingInsights(null);
         }
 
         return state;
@@ -166,7 +176,42 @@ export default function App() {
     setTaskCode(response.task.currentCode ?? response.task.starterCode ?? "");
     setFeedback(null);
     setRunResult(null);
+    setImposterHints(null);
+    setAiVerification(null);
     setError("");
+
+    // If imposter, fetch AI sabotage hints in the background
+    if (response.task.fakeOnly) {
+      fetchImposterHints(response.task.id);
+    }
+  }
+
+  async function fetchImposterHints(taskId) {
+    setAiLoading(true);
+    const result = await emitWithAck("request_imposter_hints", { taskId });
+    setAiLoading(false);
+    if (result.ok && result.hints) {
+      setImposterHints(result.hints);
+    }
+  }
+
+  async function autoAiReview(taskId, code, taskTitle) {
+    setAiLoading(true);
+    const result = await emitWithAck("request_ai_verify", { taskId, code });
+    setAiLoading(false);
+    if (result.ok && result.verification) {
+      setAiVerification(result.verification);
+      setAiReviews((prev) => [...prev, { taskTitle, ...result.verification }]);
+    }
+  }
+
+  async function fetchMeetingInsights() {
+    setAiLoading(true);
+    const result = await emitWithAck("request_meeting_insights");
+    setAiLoading(false);
+    if (result.ok && result.insight) {
+      setMeetingInsights(result.insight);
+    }
   }
 
   function handleTaskCodeChange(nextCode) {
@@ -203,15 +248,20 @@ export default function App() {
 
   async function submitTask(taskId, response) {
     const result = await emitWithAck("submit_task", { taskId, response });
+    setRunResult(result.result ?? null);
+
     if (!result.ok) {
-      setRunResult(result.result ?? null);
       setFeedback({ ok: false, message: result.error });
-      return;
+    } else {
+      setFeedback({ ok: true, message: result.message });
     }
 
-    setRunResult(result.result ?? null);
-    setFeedback({ ok: true, message: result.message });
-    if (result.ok) {
+    // Auto-trigger AI review for codemates on every submission (pass or fail)
+    const currentTask = task;
+    if (currentTask && !currentTask.fakeOnly) {
+      autoAiReview(taskId, response.code, currentTask.title);
+    } else if (result.ok) {
+      // Imposter faking — just close after a short delay
       window.setTimeout(() => {
         setTask(null);
         setFeedback(null);
@@ -253,6 +303,8 @@ export default function App() {
     setTaskCode("");
     setFeedback(null);
     setRunResult(null);
+    setImposterHints(null);
+    setAiVerification(null);
   }
 
   return (
@@ -293,10 +345,19 @@ export default function App() {
         canBypassBlackout={roomState?.viewerRole === "Imposter"}
         isSpectator={roomState ? !roomState.players.find((player) => player.id === roomState.currentPlayerId)?.isAlive : false}
         currentPlayerId={roomState?.currentPlayerId}
+        imposterHints={imposterHints}
+        aiVerification={aiVerification}
+        aiLoading={aiLoading}
       />
       <RoleRevealModal role={roleReveal} onClose={() => setRoleReveal(null)} />
-      <MeetingModal roomState={roomState} onVote={submitVote} />
-      {roomState?.state === "ended" ? <EndScreen roomState={roomState} onReset={() => window.location.reload()} /> : null}
+      <MeetingModal
+        roomState={roomState}
+        onVote={submitVote}
+        meetingInsights={meetingInsights}
+        onRequestInsights={fetchMeetingInsights}
+        aiLoading={aiLoading}
+      />
+      {roomState?.state === "ended" ? <EndScreen roomState={roomState} aiReviews={aiReviews} onReset={() => window.location.reload()} /> : null}
     </div>
   );
 }

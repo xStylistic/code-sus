@@ -428,7 +428,8 @@ select {
 
 .modal--code {
   width: min(1120px, 100%);
-  overflow: hidden;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 .role-reveal {
@@ -616,13 +617,114 @@ select {
   text-transform: uppercase;
 }
 
+/* ── AI Features ────────────────────────────────────────────────────────── */
+
+.task-layout--three-col {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.6fr) minmax(220px, 0.6fr);
+}
+
+.task-panel--sabotage {
+  border: 1px solid rgba(255, 95, 109, 0.25);
+  background: rgba(255, 95, 109, 0.06);
+}
+
+.banner--imposter {
+  background: rgba(255, 95, 109, 0.16);
+  border: 1px solid rgba(255, 95, 109, 0.2);
+}
+
+.hint-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 95, 109, 0.08);
+  border: 1px solid rgba(255, 95, 109, 0.18);
+  color: #f5fbff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hint-card:hover {
+  background: rgba(255, 95, 109, 0.18);
+  border-color: rgba(255, 95, 109, 0.35);
+}
+
+.hint-code {
+  display: block;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 95, 109, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #cde5ff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+
+.hint-bad-practice {
+  font-size: 0.82rem;
+  color: #ff8787;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.end-reviews {
+  margin-top: 16px;
+  text-align: left;
+}
+
+.end-reviews h3 {
+  margin-bottom: 4px;
+}
+
+.end-review-card {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.button-ai {
+  border: 1px solid rgba(128, 255, 219, 0.22);
+  background: rgba(128, 255, 219, 0.1);
+  color: #80ffdb;
+}
+
+.button-ai:hover:not(:disabled) {
+  background: rgba(128, 255, 219, 0.18);
+}
+
+.ai-verification {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-insights {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(128, 255, 219, 0.06);
+  border: 1px solid rgba(128, 255, 219, 0.15);
+}
+
 @media (max-width: 980px) {
   .shell,
   .game-layout {
     grid-template-columns: 1fr;
   }
 
-  .task-layout {
+  .task-layout,
+  .task-layout--three-col {
     grid-template-columns: 1fr;
   }
 

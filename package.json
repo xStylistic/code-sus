@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "dev:all": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\" \"cd agent && python agent_service.py\"",
     "build": "npm run build --workspace client",
     "start": "npm run start --workspace server"
   },
