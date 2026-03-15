@@ -248,9 +248,9 @@ export function GameBoard({
                       ? `Blackout ${blackoutCooldownSeconds}s`
                       : "Trigger Blackout"}
                 </button>
-                <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
+                {/* <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
                   Corrupt Task
-                </button>
+                </button> */}
               </>
             ) : null}
           </div>
