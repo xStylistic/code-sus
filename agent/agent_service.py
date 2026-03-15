@@ -84,10 +84,7 @@ class GenerateTaskRequest(BaseModel):
     task_type: Literal[
         "inheritance",
         "polymorphism",
-        "encapsulation",
-        "abstraction",
-        "composition",
-        "single_responsibility"
+        "encapsulation"
     ]
     language: str = "javascript"
 
@@ -96,10 +93,7 @@ class ImposterHintsRequest(BaseModel):
     task_type: Literal[
         "inheritance",
         "polymorphism",
-        "encapsulation",
-        "abstraction",
-        "composition",
-        "single_responsibility"
+        "encapsulation"
     ]
     language: str = "javascript"
     current_code: str = ""
@@ -110,10 +104,7 @@ class VerifyCodeRequest(BaseModel):
     task_type: Literal[
         "inheritance",
         "polymorphism",
-        "encapsulation",
-        "abstraction",
-        "composition",
-        "single_responsibility"
+        "encapsulation"
     ]
     language: str = "javascript"
     code: str
@@ -226,6 +217,7 @@ task_generator = rt.agent_node(
         "- The solution must be complete and runnable\n"
         "- Validation patterns must be literal code fragments from the solution\n"
         "- Keep code concise (under 30 lines)\n"
+        "- Keep tasks beginner-friendly and not too complex\n"
         "- Generate DIFFERENT scenarios each time (not always Dog/Animal or BankAccount)\n"
         "- Use creative class names like Vehicle/ElectricCar, Weapon/Sword, Shape/Hexagon, etc.\n"
         "- Visible checks should be written as plain English specs\n"

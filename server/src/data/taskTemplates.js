@@ -1221,18 +1221,15 @@ int send(LogManager* lm, const char* payload) { return 1; }
 ];
 
 export function cloneTaskTemplates() {
-  // Shuffle all available templates
-  const shuffled = [...TASK_TEMPLATES].sort(() => 0.5 - Math.random());
-  
-  // Pick exactly 3 to play with in this match
-  const selected = shuffled.slice(0, 3);
-  
-  // Assign them to the 3 map stations so they spawn correctly in the rooms
-  const stationIds = ["inheritance-bay", "polymorphism-lab", "encapsulation-vault"];
-  
-  return selected.map((task, index) => ({
+  const selectedIds = new Set([
+    "inheritance-core",
+    "polymorphism-core",
+    "encapsulation-core"
+  ]);
+  const selected = TASK_TEMPLATES.filter((task) => selectedIds.has(task.id));
+
+  return selected.map((task) => ({
     ...task,
-    stationId: stationIds[index],
     status: "pending",
     completedBy: null,
     corrupted: false
