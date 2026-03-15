@@ -1,4 +1,29 @@
+import { useEffect, useLayoutEffect, useRef } from "react";
+
 export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, isSpectator }) {
+  const editorRef = useRef(null);
+  const selectionRef = useRef({ start: null, end: null });
+
+  useEffect(() => {
+    selectionRef.current = { start: null, end: null };
+  }, [task?.id]);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    const selection = selectionRef.current;
+    if (!editor || document.activeElement !== editor) {
+      return;
+    }
+
+    if (selection.start === null || selection.end === null) {
+      return;
+    }
+
+    const nextStart = Math.min(selection.start, code.length);
+    const nextEnd = Math.min(selection.end, code.length);
+    editor.setSelectionRange(nextStart, nextEnd);
+  }, [code]);
+
   if (!task) {
     return null;
   }
@@ -33,12 +58,25 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
               </div>
             ) : null}
             <textarea
+              ref={editorRef}
               className="code-editor"
               spellCheck="false"
               value={code}
               onChange={(event) => onCodeChange(event.target.value)}
+              onSelect={(event) => {
+                selectionRef.current = {
+                  start: event.target.selectionStart,
+                  end: event.target.selectionEnd
+                };
+              }}
               disabled={isSpectator}
             />
+            {isBlackout ? (
+              <div className="blackout-mask">
+                <strong>Blackout</strong>
+                <span>Your workspace is offline.</span>
+              </div>
+            ) : null}
           </section>
 
           <section className="task-panel">

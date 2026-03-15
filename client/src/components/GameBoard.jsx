@@ -66,7 +66,13 @@ export function GameBoard({
             <span><i className="legend-dot legend-dot--player" /> Crew position</span>
           </div>
         </div>
-        <div className="map" style={{ width: roomState.map.width, height: roomState.map.height }}>
+        <div
+          className="map"
+          style={{
+            "--map-width": `${roomState.map.width}px`,
+            "--map-height": `${roomState.map.height}px`
+          }}
+        >
           <div className="map-corridor map-corridor--top" />
           <div className="map-corridor map-corridor--mid" />
           <div className="map-corridor map-corridor--vertical" />
