@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MAP_ROOMS } from "../data/mapData.js";
 
 const MOVE_STEP = 8;
@@ -11,7 +11,10 @@ export function GameBoard({
   onTriggerSabotage
 }) {
   const keysRef = useRef(new Set());
+  const [now, setNow] = useState(Date.now());
   const me = roomState.players.find((player) => player.id === roomState.currentPlayerId);
+  const blackoutCooldownMs = Math.max(0, (roomState.blackoutCooldownUntil ?? 0) - now);
+  const blackoutCooldownSeconds = Math.ceil(blackoutCooldownMs / 1000);
   const nearbyStation = useMemo(() => {
     if (!me) {
       return null;
@@ -19,6 +22,14 @@ export function GameBoard({
 
     return roomState.map.stations.find((station) => Math.hypot(me.x - station.x, me.y - station.y) < 80) ?? null;
   }, [me, roomState.map.stations]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event) => keysRef.current.add(event.key.toLowerCase());
@@ -157,8 +168,12 @@ export function GameBoard({
           </button>
           {roomState.viewerRole === "Imposter" ? (
             <>
-              <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("blackout")}>
-                Trigger Blackout
+              <button
+                className="button-danger"
+                disabled={Boolean(roomState.activeSabotage) || blackoutCooldownMs > 0}
+                onClick={() => onTriggerSabotage("blackout")}
+              >
+                {blackoutCooldownMs > 0 ? `Blackout ${blackoutCooldownSeconds}s` : "Trigger Blackout"}
               </button>
               <button className="button-danger" disabled={Boolean(roomState.activeSabotage)} onClick={() => onTriggerSabotage("code_corruption")}>
                 Corrupt Task

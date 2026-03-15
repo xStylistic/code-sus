@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, isSpectator }) {
+export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, feedback, runResult, isBlackout, canBypassBlackout, isSpectator }) {
   const editorRef = useRef(null);
   const selectionRef = useRef({ start: null, end: null });
 
@@ -71,7 +71,7 @@ export function TaskModal({ task, code, onCodeChange, onClose, onRun, onSubmit, 
               }}
               disabled={isSpectator}
             />
-            {isBlackout ? (
+            {isBlackout && !canBypassBlackout ? (
               <div className="blackout-mask">
                 <strong>Blackout</strong>
                 <span>Your workspace is offline.</span>
