@@ -366,10 +366,7 @@ export class GameRoom {
       return { ok: false, error: "Shared editing is unavailable right now." };
     }
 
-    const starterCode = this.getStarterCode(task);
-    const previousCode = this.sharedTaskCode[taskId] ?? starterCode;
-    const nextCode = String(code ?? "");
-    this.sharedTaskCode[taskId] = violatesTemplateGuard(nextCode, starterCode) ? previousCode : nextCode;
+    this.sharedTaskCode[taskId] = String(code ?? "");
     if (!this.taskEditors[taskId]?.includes(player.name)) {
       this.taskEditors[taskId] = [...(this.taskEditors[taskId] ?? []), player.name];
     }
@@ -616,27 +613,6 @@ GameRoom.prototype.getStarterCode = function getStarterCode(task) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-function violatesTemplateGuard(nextCode, starterCode) {
-  const starter = String(starterCode ?? "");
-  if (!starter.length) {
-    return false;
-  }
-
-  const next = String(nextCode ?? "");
-  return !containsInOrder(starter, next);
-}
-
-function containsInOrder(source, candidate) {
-  let sourceIndex = 0;
-  for (let candidateIndex = 0; candidateIndex < candidate.length && sourceIndex < source.length; candidateIndex += 1) {
-    if (candidate[candidateIndex] === source[sourceIndex]) {
-      sourceIndex += 1;
-    }
-  }
-
-  return sourceIndex === source.length;
 }
 
 // Walkable zones: must match MAP_WALKABLE in client/src/data/mapData.js

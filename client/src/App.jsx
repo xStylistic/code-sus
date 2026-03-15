@@ -177,11 +177,8 @@ export default function App() {
       return;
     }
 
-    const starterCode = task.starterCode ?? "";
-    const protectedCode = violatesTemplateGuard(nextCode, starterCode) ? taskCode || starterCode : nextCode;
-    setTaskCode(protectedCode);
-
-    socket.emit("update_task_code", { taskId: task.id, code: protectedCode });
+    setTaskCode(nextCode);
+    socket.emit("update_task_code", { taskId: task.id, code: nextCode });
   }
 
   function handleTaskCursorChange(selectionStart, selectionEnd) {
@@ -305,25 +302,4 @@ export default function App() {
       {roomState?.state === "ended" ? <EndScreen roomState={roomState} onReset={() => window.location.reload()} /> : null}
     </div>
   );
-}
-
-function violatesTemplateGuard(nextCode, starterCode) {
-  const starter = String(starterCode ?? "");
-  if (!starter.length) {
-    return false;
-  }
-
-  const next = String(nextCode ?? "");
-  return !containsInOrder(starter, next);
-}
-
-function containsInOrder(source, candidate) {
-  let sourceIndex = 0;
-  for (let candidateIndex = 0; candidateIndex < candidate.length && sourceIndex < source.length; candidateIndex += 1) {
-    if (candidate[candidateIndex] === source[sourceIndex]) {
-      sourceIndex += 1;
-    }
-  }
-
-  return sourceIndex === source.length;
 }

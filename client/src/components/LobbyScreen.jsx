@@ -20,10 +20,10 @@ export function LobbyScreen({
   return (
     <div className="shell shell--lobby">
       <section className="hero-card">
-        <p className="eyebrow">Social deduction meets low-level design</p>
+        <p className="eyebrow">ULTIMATE CODE OFF GAME.</p>
         <h1>Code Sus</h1>
         <p className="lede">
-          Move through a playful lab ship, solve quick OOP puzzles, and catch the bug-injecting imposter.
+          Move through a lab ship, solve quick OOP puzzles, and catch the bug-injecting hacker.
         </p>
 
         <div className="lobby-form">
