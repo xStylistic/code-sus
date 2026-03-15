@@ -23,6 +23,14 @@ export function TaskModal({
     return (task?.cursors ?? []).filter((cursor) => cursor.playerId !== currentPlayerId);
   }, [task?.cursors, currentPlayerId]);
 
+  function updateSelectionState(target) {
+    selectionRef.current = {
+      start: target.selectionStart,
+      end: target.selectionEnd
+    };
+    onCursorChange?.(target.selectionStart, target.selectionEnd);
+  }
+
   useEffect(() => {
     selectionRef.current = { start: null, end: null };
     setRemoteMarkers([]);
@@ -118,18 +126,14 @@ export function TaskModal({
                 spellCheck="false"
                 value={code}
                 onChange={(event) => {
+                  updateSelectionState(event.target);
                   onCodeChange(event.target.value);
-                  onCursorChange?.(event.target.selectionStart, event.target.selectionEnd);
                 }}
                 onSelect={(event) => {
-                  selectionRef.current = {
-                    start: event.target.selectionStart,
-                    end: event.target.selectionEnd
-                  };
-                  onCursorChange?.(event.target.selectionStart, event.target.selectionEnd);
+                  updateSelectionState(event.target);
                 }}
-                onKeyUp={(event) => onCursorChange?.(event.target.selectionStart, event.target.selectionEnd)}
-                onClick={(event) => onCursorChange?.(event.target.selectionStart, event.target.selectionEnd)}
+                onKeyUp={(event) => updateSelectionState(event.target)}
+                onClick={(event) => updateSelectionState(event.target)}
                 disabled={isSpectator}
               />
               <div className="cursor-layer" aria-hidden="true">
