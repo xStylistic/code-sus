@@ -18,6 +18,27 @@ export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, o
     onCursorChange?.(target.selectionStart, target.selectionEnd);
   }
 
+  function handleEditorKeyDown(event) {
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    event.preventDefault();
+    const target = event.target;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const indent = "  ";
+    const nextCode = `${code.slice(0, start)}${indent}${code.slice(end)}`;
+    const nextCaret = start + indent.length;
+
+    selectionRef.current = {
+      start: nextCaret,
+      end: nextCaret
+    };
+    onCursorChange?.(nextCaret, nextCaret);
+    onCodeChange(nextCode);
+  }
+
   useEffect(() => {
     selectionRef.current = { start: null, end: null };
     setRemoteMarkers([]);
@@ -109,27 +130,33 @@ export function TaskModal({ task, code, onCodeChange, onCursorChange, onClose, o
             <div className="code-editor-wrap">
               <textarea
                 ref={editorRef}
-              className="code-editor"
-              spellCheck="false"
-              value={code}
-              onChange={(event) => onCodeChange(event.target.value)}
-              onSelect={(event) => updateSelectionState(event.target)}
-              disabled={isSpectator}
-            />
-            <div className="cursor-layer">
-              {remoteMarkers.map((marker) => (
-                <div
-                  key={marker.playerId || marker.name}
-                  className="remote-cursor"
-                  style={{ top: marker.top, left: marker.left, backgroundColor: marker.color }}
-                >
-                  <span className="remote-cursor-name" style={{ backgroundColor: marker.color }}>
-                    {marker.name}
-                  </span>
-                </div>
-              ))}
+                className="code-editor"
+                spellCheck="false"
+                value={code}
+                onChange={(event) => {
+                  updateSelectionState(event.target);
+                  onCodeChange(event.target.value);
+                }}
+                onKeyDown={handleEditorKeyDown}
+                onSelect={(event) => updateSelectionState(event.target)}
+                onKeyUp={(event) => updateSelectionState(event.target)}
+                onClick={(event) => updateSelectionState(event.target)}
+                disabled={isSpectator}
+              />
+              <div className="cursor-layer">
+                {remoteMarkers.map((marker) => (
+                  <div
+                    key={marker.playerId || marker.name}
+                    className="remote-cursor"
+                    style={{ top: marker.top, left: marker.left, backgroundColor: marker.color }}
+                  >
+                    <span className="remote-cursor-name" style={{ backgroundColor: marker.color }}>
+                      {marker.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
             {isBlackout && !canBypassBlackout ? (
               <div className="blackout-mask">
                 <strong>Blackout</strong>
