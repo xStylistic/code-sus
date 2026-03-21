@@ -7,9 +7,8 @@ import { MeetingModal } from "./components/MeetingModal.jsx";
 import { EndScreen } from "./components/EndScreen.jsx";
 import { RoleRevealModal } from "./components/RoleRevealModal.jsx";
 
-const defaultServerUrl =
-  import.meta.env.VITE_SERVER_URL ??
-  `${window.location.protocol}//${window.location.hostname}:3001`;
+
+const defaultServerUrl = "https://code-sus-backend.onrender.com";
 
 const socket = io(defaultServerUrl, {
   autoConnect: true
